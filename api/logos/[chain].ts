@@ -25,6 +25,12 @@ async function tokens(chain?: string | null): Promise<Response> {
             }
             return map;
         }, {});
+
+        logos['ALPU@alpacastoken'] = {
+            logo: 'https://raw.githubusercontent.com/jandrad/eos-airdrops/master/logos/ALPU.png',
+            logo_lg: 'https://raw.githubusercontent.com/jandrad/eos-airdrops/master/logos/ALPU_lg.png',
+        }
+
         return new Response(JSON.stringify(logos), { headers: { 'Cache-Control': 's-maxage=600', 'content-type': 'application/json'}, });
     } catch (error) {
         return new Response(error.message, { status: 500 });
