@@ -16,6 +16,7 @@ paths:
           in: path
           required: true
           type: string
+          example: wax
       responses:
         200:
           description: "Success."
@@ -34,6 +35,7 @@ paths:
           in: path
           required: true
           type: string
+          example: cop
       responses:
         200:
           description: "Success."
@@ -52,6 +54,7 @@ paths:
           in: path
           required: true
           type: string
+          example: eth
       responses:
         200:
           description: "Success."
