@@ -9,28 +9,53 @@ async function tokens(chain?: string | null): Promise<Response> {
         if (!chain) {
             return new Response('No symbol provided', { status: 400 });
         }
-        const result = await fetch(`https://raw.githubusercontent.com/eoscafe/eos-airdrops/master/tokens.json`, {
-            method: 'GET',
-            redirect: 'follow',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
-        const list = await result.json();
-        const filtered = list.filter((token: any) => token.chain === chain);
-        const logos = filtered.reduce((map: any, token: any) => {
-            map[`${token.symbol}@${token.account}`] = {
-                logo: token.logo,
-                logo_lg: token.logo_lg,
-            }
-            return map;
-        }, {});
+        const [eosCafePromise, alcorPromise] = await Promise.allSettled([
+            fetch(`https://raw.githubusercontent.com/eoscafe/eos-airdrops/master/tokens.json`, {
+                method: 'GET',
+                redirect: 'follow',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            }),
+            fetch(`https://api.github.com/repos/avral/alcor-ui/contents/assets/tokens/${chain.toLowerCase()}`, {
+                method: 'GET',
+                redirect: 'follow',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            }),
+        ]);
 
-        logos['ALPU@alpacastoken'] = {
-            logo: 'https://raw.githubusercontent.com/jandrad/eos-airdrops/master/logos/ALPU.png',
-            logo_lg: 'https://raw.githubusercontent.com/jandrad/eos-airdrops/master/logos/ALPU_lg.png',
+        const logos: Record<string, any> = {};
+
+        if (alcorPromise.status === 'rejected' && eosCafePromise.status === 'rejected') {
+            return new Response('No logos found', { status: 404 });
         }
 
+        if (alcorPromise.status === 'fulfilled') {
+            (await alcorPromise.value.json())
+            .forEach((token: any) => {
+                const nameWithoutLastExtension = token.name.split('.').slice(0, -1).join('.');
+                const [symbol, contract] = nameWithoutLastExtension.split('_');
+                if (symbol && contract) {
+                    logos[`${symbol.toUpperCase()}@${contract.toLowerCase()}`] = {
+                        logo: token.download_url,
+                        logo_lg: token.download_url,
+                    }
+                }
+            });
+        }
+
+        if (eosCafePromise.status === 'fulfilled') {
+            (await eosCafePromise.value.json())
+            .filter((token: any) => token.chain === chain)
+            .forEach((token: any) => {
+                logos[`${token.symbol}@${token.account}`] = {
+                    logo: token.logo,
+                    logo_lg: token.logo_lg,
+                }
+            });
+        }
         return new Response(JSON.stringify(logos), { headers: { 'Cache-Control': 's-maxage=600', 'content-type': 'application/json'}, });
     } catch (error) {
         return new Response(error.message, { status: 500 });
