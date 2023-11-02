@@ -9,14 +9,28 @@ async function rate(symbol?: string | null): Promise<Response> {
         if (!symbol) {
             return new Response('No symbol provided', { status: 400 });
         }
-        const result = await fetch(`https://cryptoprices.cc/${symbol}`, {
-            method: 'GET',
-            redirect: 'follow',
-            headers: {
-                'Content-Type': 'text/plain',
-            }
-        });
-        const rate = await result.text();
+
+        let rate;
+        try {
+            const result = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${symbol}&tsyms=USD`, {
+                method: 'GET',
+                redirect: 'follow',
+                headers: {
+                    'Content-Type': 'text/plain',
+                }
+            });
+            rate = (await result.json()).USD;
+        } catch (error) {
+            const result = await fetch(`https://cryptoprices.cc/${symbol}`, {
+                method: 'GET',
+                redirect: 'follow',
+                headers: {
+                    'Content-Type': 'text/plain',
+                }
+            });
+            rate = await result.text();
+        }
+        
         if (!rate) {
             return new Response('No rate found', { status: 404 });
         }
