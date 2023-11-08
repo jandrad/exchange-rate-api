@@ -33,28 +33,37 @@ async function tokens(chain?: string | null): Promise<Response> {
         }
 
         if (alcorPromise.status === 'fulfilled') {
-            (await alcorPromise.value.json())
-            .forEach((token: any) => {
-                const nameWithoutLastExtension = token.name.split('.').slice(0, -1).join('.');
-                const [symbol, contract] = nameWithoutLastExtension.split('_');
-                if (symbol && contract) {
-                    logos[`${symbol.toUpperCase()}@${contract.toLowerCase()}`] = {
-                        logo: token.download_url,
-                        logo_lg: token.download_url,
+            try {
+                (await alcorPromise.value.json())
+                .forEach((token: any) => {
+                    const nameWithoutLastExtension = token.name.split('.').slice(0, -1).join('.');
+                    const [symbol, contract] = nameWithoutLastExtension.split('_');
+                    if (symbol && contract) {
+                        logos[`${symbol.toUpperCase()}@${contract.toLowerCase()}`] = {
+                            logo: token.download_url,
+                            logo_lg: token.download_url,
+                        }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.log(error);
+            }
         }
 
         if (eosCafePromise.status === 'fulfilled') {
-            (await eosCafePromise.value.json())
-            .filter((token: any) => token.chain === chain)
-            .forEach((token: any) => {
-                logos[`${token.symbol}@${token.account}`] = {
-                    logo: token.logo,
-                    logo_lg: token.logo_lg,
-                }
-            });
+            try {
+                const text = (await eosCafePromise.value.text()).replace(`"chain": "wax",`, `"chain": "wax"`); // fix invalid json
+                JSON.parse(text)
+                .filter((token: any) => token.chain === chain)
+                .forEach((token: any) => {
+                    logos[`${token.symbol}@${token.account}`] = {
+                        logo: token.logo,
+                        logo_lg: token.logo_lg,
+                    }
+                });
+            } catch (error) {
+                console.log(error);   
+            }
         }
         return new Response(JSON.stringify(logos), { headers: { 'Cache-Control': 's-maxage=600', 'content-type': 'application/json'}, });
     } catch (error) {
