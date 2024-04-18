@@ -1,9 +1,5 @@
 import cors from '../../lib/cors'
 
-export const config = {
-    runtime: 'edge',
-};
-
 async function tokens(chain?: string | null): Promise<Response> {
     try {
         if (!chain) {
@@ -34,7 +30,7 @@ async function tokens(chain?: string | null): Promise<Response> {
 
         if (alcorPromise.status === 'fulfilled') {
             try {
-                (await alcorPromise.value.json())
+                (await alcorPromise.value.json() as any)
                 .forEach((token: any) => {
                     const nameWithoutLastExtension = token.name.split('.').slice(0, -1).join('.');
                     const [symbol, contract] = nameWithoutLastExtension.split('_');
@@ -67,17 +63,17 @@ async function tokens(chain?: string | null): Promise<Response> {
         }
         return new Response(JSON.stringify(logos), { headers: { 'Cache-Control': 's-maxage=600', 'content-type': 'application/json'}, });
     } catch (error) {
-        return new Response(error.message, { status: 500 });
+        if (error instanceof Error) {
+            return new Response(error.message, { status: 500 });
+        }
+        return new Response('Unknown error', { status: 500 });
     }
 }
 
-export default async (req: Request) => {
-    let res = new Response("");
-    if (req.method === 'GET') {
-        const url = new URL(req.url);
-        const urlSearchParams = new URLSearchParams(url.search);
-        const ticker = urlSearchParams.get('chain')?.toLocaleLowerCase();
-        res = await tokens(ticker);
-    }
-    return cors(req, res);
+export const onRequestGet: PagesFunction = async({ request }) => {
+    const url = new URL(request.url);
+    const urlSearchParams = new URLSearchParams(url.search);
+    const ticker = urlSearchParams.get('ticker')?.toUpperCase();
+    const res = await tokens(ticker);
+    return cors(request, res);
 };
