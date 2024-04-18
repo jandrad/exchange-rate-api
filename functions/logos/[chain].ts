@@ -73,6 +73,7 @@ async function tokens(chain?: string | null): Promise<Response> {
 
 
 export const onRequestGet: PagesFunction = async({ request, params }) => {
+    console.log(request);
     const chain = params.chain as string;
     const res = await tokens(chain);
     return cors(request, res);
