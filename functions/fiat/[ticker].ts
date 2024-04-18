@@ -32,10 +32,8 @@ interface Env {
     API_KEY:string;
  }
 
-export const onRequestGet: PagesFunction<Env> = async({ request, env }) => {
-    const url = new URL(request.url);
-    const urlSearchParams = new URLSearchParams(url.search);
-    const ticker = urlSearchParams.get('ticker')?.toUpperCase();
+export const onRequestGet: PagesFunction<Env> = async({ request, env, params }) => {
+    const ticker = (params.ticker as string).toUpperCase();
     const res = await rate(env.API_KEY, ticker);
     return cors(request, res);
 };

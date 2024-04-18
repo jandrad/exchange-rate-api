@@ -39,10 +39,8 @@ async function rate(symbol?: string | null): Promise<Response> {
     }
 }
 
-export const onRequestGet: PagesFunction = async({ request }) => {
-    const url = new URL(request.url);
-    const urlSearchParams = new URLSearchParams(url.search);
-    const ticker = urlSearchParams.get('ticker')?.toUpperCase();
+export const onRequestGet: PagesFunction = async({ request, params }) => {
+    const ticker = (params.ticker as string).toUpperCase();
     const res = await rate(ticker);
     return cors(request, res);
 };
