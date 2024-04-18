@@ -5,7 +5,7 @@ async function rate(apiKey: string, symbol?: string | null): Promise<Response> {
         if (!symbol) {
             return new Response('No symbol provided', { status: 400 });
         }
-        const result = await fetch(`https://api.currencyfreaks.com/latest?apikey=${apikey}&symbols=${symbol}`, {
+        const result = await fetch(`https://api.currencyfreaks.com/latest?apikey=${apiKey}&symbols=${symbol}`, {
             method: 'GET',
             redirect: 'follow',
             headers: {
