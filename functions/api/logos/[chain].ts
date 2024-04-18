@@ -1,4 +1,4 @@
-import cors from '../../lib/cors'
+import cors from '../../../lib/cors'
 
 async function tokens(chain?: string | null): Promise<Response> {
     try {
@@ -11,6 +11,7 @@ async function tokens(chain?: string | null): Promise<Response> {
                 redirect: 'follow',
                 headers: {
                     'Content-Type': 'application/json',
+                    'User-Agent': 'request',
                 }
             }),
             fetch(`https://api.github.com/repos/avral/alcor-ui/contents/assets/tokens/${chain.toLowerCase()}`, {
@@ -18,6 +19,7 @@ async function tokens(chain?: string | null): Promise<Response> {
                 redirect: 'follow',
                 headers: {
                     'Content-Type': 'application/json',
+                    'User-Agent': 'request',
                 }
             }),
         ]);
@@ -48,9 +50,8 @@ async function tokens(chain?: string | null): Promise<Response> {
 
         if (eosCafePromise.status === 'fulfilled') {
             try {
-                const text = (await eosCafePromise.value.text()).replace(`"chain": "wax",`, `"chain": "wax"`); // fix invalid json
-                JSON.parse(text)
-                .filter((token: any) => token.chain === chain)
+                const json = await eosCafePromise.value.json() as any;
+                json.filter((token: any) => token.chain === chain)
                 .forEach((token: any) => {
                     logos[`${token.symbol}@${token.account}`] = {
                         logo: token.logo,
@@ -61,6 +62,7 @@ async function tokens(chain?: string | null): Promise<Response> {
                 console.log(error);   
             }
         }
+
         return new Response(JSON.stringify(logos), { headers: { 'Cache-Control': 's-maxage=600', 'content-type': 'application/json'}, });
     } catch (error) {
         if (error instanceof Error) {
@@ -73,7 +75,6 @@ async function tokens(chain?: string | null): Promise<Response> {
 
 
 export const onRequestGet: PagesFunction = async({ request, params }) => {
-    console.log(request);
     const chain = params.chain as string;
     const res = await tokens(chain);
     return cors(request, res);
