@@ -3,9 +3,9 @@ info:
   title: Rates API
   description: "Get exchange rates and token information"
   version: "1.0.0"
-host: rates.neftyblocks.com
 schemes:
   - "https"
+  - "http"
 paths:
   "/api/logos/{chain}":
     get:
