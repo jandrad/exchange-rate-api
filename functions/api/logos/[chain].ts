@@ -3,9 +3,17 @@ import cors from '../../../lib/cors'
 async function tokens(chain?: string | null): Promise<Response> {
     try {
         if (!chain) {
-            return new Response('No symbol provided', { status: 400 });
+            return new Response('No chain provided', { status: 400 });
         }
-        const [eosCafePromise, alcorPromise] = await Promise.allSettled([
+
+        let mainChain = chain;
+        let launchbagzUrl = 'https://aa.neftyblocks.com';
+        if (chain.includes('test')) { 
+            mainChain = chain.replace('test', '');
+            launchbagzUrl = 'https://aa-testnet.neftyblocks.com';
+        }
+
+        const [eosCafePromise, alcorPromise, launchbagzTokens] = await Promise.allSettled([
             fetch(`https://raw.githubusercontent.com/eoscafe/eos-airdrops/master/tokens.json`, {
                 method: 'GET',
                 redirect: 'follow',
@@ -14,7 +22,15 @@ async function tokens(chain?: string | null): Promise<Response> {
                     'User-Agent': 'request',
                 }
             }),
-            fetch(`https://api.github.com/repos/avral/alcor-ui/contents/assets/tokens/${chain.toLowerCase()}`, {
+            fetch(`https://api.github.com/repos/avral/alcor-ui/contents/assets/tokens/${mainChain.toLowerCase()}`, {
+                method: 'GET',
+                redirect: 'follow',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'request',
+                }
+            }),
+            fetch(`${launchbagzUrl}/launchbagz/v1/tokens?limit=1000`, {
                 method: 'GET',
                 redirect: 'follow',
                 headers: {
@@ -26,7 +42,7 @@ async function tokens(chain?: string | null): Promise<Response> {
 
         const logos: Record<string, any> = {};
 
-        if (alcorPromise.status === 'rejected' && eosCafePromise.status === 'rejected') {
+        if (alcorPromise.status === 'rejected' && eosCafePromise.status === 'rejected' && launchbagzTokens.status === 'rejected') {
             return new Response('No logos found', { status: 404 });
         }
 
@@ -60,6 +76,20 @@ async function tokens(chain?: string | null): Promise<Response> {
                 });
             } catch (error) {
                 console.log(error);   
+            }
+        }
+
+        if (launchbagzTokens.status === 'fulfilled') {
+            try {
+                (await launchbagzTokens.value.json() as any)
+                .forEach((token: any) => {
+                    logos[`${token.code.toUpperCase()}@${token.contract}`] = {
+                        logo: `https://ipfs.neftyblocks.io/ipfs/${token.image}`,
+                        logo_lg: `https://ipfs.neftyblocks.io/ipfs/${token.image}`
+                    }
+                });
+            } catch (error) {
+                console.log(error);
             }
         }
 
