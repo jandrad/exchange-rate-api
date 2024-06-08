@@ -9,13 +9,13 @@ async function tokens(chain?: string | null): Promise<Response> {
         let mainChain = chain;
         let launchbagzUrl = chain.includes('wax') ? 'https://aa.neftyblocks.com' : undefined;
         if (chain.includes('test')) { 
-            mainChain = chain.replace('test', '').replace('testnet', '');
+            mainChain = chain.replace('testnet', '').replace('test', '');
             if (launchbagzUrl) {
                 launchbagzUrl = 'https://aa-testnet.neftyblocks.com';
             }
         }
         if (chain.includes('main')) { 
-            mainChain = chain.replace('main', '').replace('mainnet', '');
+            mainChain = chain.replace('mainnet', '').replace('main', '');
         }
 
         const [eosCafePromise, alcorPromise, launchbagzTokens] = await Promise.allSettled([
