@@ -7,10 +7,12 @@ async function tokens(chain?: string | null): Promise<Response> {
         }
 
         let mainChain = chain;
-        let launchbagzUrl = 'https://aa.neftyblocks.com';
+        let launchbagzUrl = chain.includes('wax') ? 'https://aa.neftyblocks.com' : undefined;
         if (chain.includes('test')) { 
             mainChain = chain.replace('test', '');
-            launchbagzUrl = 'https://aa-testnet.neftyblocks.com';
+            if (launchbagzUrl) {
+                launchbagzUrl = 'https://aa-testnet.neftyblocks.com';
+            }
         }
 
         const [eosCafePromise, alcorPromise, launchbagzTokens] = await Promise.allSettled([
@@ -30,14 +32,14 @@ async function tokens(chain?: string | null): Promise<Response> {
                     'User-Agent': 'request',
                 }
             }),
-            fetch(`${launchbagzUrl}/launchbagz/v1/tokens?limit=1000`, {
+            launchbagzUrl ? fetch(`${launchbagzUrl}/launchbagz/v1/tokens?limit=1000`, {
                 method: 'GET',
                 redirect: 'follow',
                 headers: {
                     'Content-Type': 'application/json',
                     'User-Agent': 'request',
                 }
-            }),
+            }) : Promise.reject(new Error('No launchbagz url provided')),
         ]);
 
         const logos: Record<string, any> = {};
@@ -81,7 +83,7 @@ async function tokens(chain?: string | null): Promise<Response> {
 
         if (launchbagzTokens.status === 'fulfilled') {
             try {
-                (await launchbagzTokens.value.json() as any)
+                (await launchbagzTokens.value.json() as any).data
                 .forEach((token: any) => {
                     logos[`${token.code.toUpperCase()}@${token.contract}`] = {
                         logo: `https://ipfs.neftyblocks.io/ipfs/${token.image}`,
