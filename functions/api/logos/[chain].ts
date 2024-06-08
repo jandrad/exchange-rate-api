@@ -85,7 +85,7 @@ async function tokens(chain?: string | null): Promise<Response> {
             try {
                 (await launchbagzTokens.value.json() as any).data
                 .forEach((token: any) => {
-                    logos[`${token.code.toUpperCase()}@${token.contract}`] = {
+                    logos[`${token.token_code.toUpperCase()}@${token.token_contract}`] = {
                         logo: `https://ipfs.neftyblocks.io/ipfs/${token.image}`,
                         logo_lg: `https://ipfs.neftyblocks.io/ipfs/${token.image}`
                     }
