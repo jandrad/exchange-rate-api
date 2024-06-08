@@ -13,8 +13,7 @@ async function tokens(chain?: string | null): Promise<Response> {
             if (launchbagzUrl) {
                 launchbagzUrl = 'https://aa-testnet.neftyblocks.com';
             }
-        }
-        if (chain.includes('main')) { 
+        } else if (chain.includes('main')) { 
             mainChain = chain.replace('mainnet', '').replace('main', '');
         }
 
@@ -72,7 +71,7 @@ async function tokens(chain?: string | null): Promise<Response> {
         if (eosCafePromise.status === 'fulfilled') {
             try {
                 const json = await eosCafePromise.value.json() as any;
-                json.filter((token: any) => token.chain === chain)
+                json.filter((token: any) => token.chain === mainChain)
                 .forEach((token: any) => {
                     logos[`${token.symbol}@${token.account}`] = {
                         logo: token.logo,
