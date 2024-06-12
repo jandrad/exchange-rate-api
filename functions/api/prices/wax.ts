@@ -37,7 +37,7 @@ async function prices(): Promise<Response> {
         for (let i = 0; i < woePrices.length; i++) {
             const price = woePrices[i];
             const key = `${price.symbol.ticker}@${price.contract}`;
-            if (prices.wax_price) {
+            if (price.wax_price) {
                 prices[key] = price.wax_price * waxPrice;
             }
         }
