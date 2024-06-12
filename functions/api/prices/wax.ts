@@ -42,7 +42,7 @@ async function prices(): Promise<Response> {
             }
         }
 
-        return new Response(JSON.stringify(prices), { headers: { 'content-type': 'application/json'}, });
+        return new Response(JSON.stringify(prices), { headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=30', 'content-type': 'application/json'}, });
     } catch (error) {
         if (error instanceof Error) {
             return new Response(error.message, { status: 500 });
