@@ -4,7 +4,7 @@ async function prices(): Promise<Response> {
     try {
         const [{ rows: waxRows }, woePrices] = await Promise.all([
             fetch(`https://wax.neftyblocks.com/v1/chain/get_table_rows`, {
-                method: 'GET',
+                method: 'POST',
                 redirect: 'follow',
                 headers: {
                     'Content-Type': 'application/json',

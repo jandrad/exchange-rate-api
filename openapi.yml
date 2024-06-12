@@ -26,6 +26,18 @@ paths:
           description: "No tokens found"
         500:
           description: "Internal server error"
+  "/api/prices/wax":
+    get:
+      description: "Get the token and prices in wax"
+      responses:
+        200:
+          description: "Success."
+          schema:
+            type: object
+        404:
+          description: "No tokens found"
+        500:
+          description: "Internal server error"
   "/api/fiat/{ticker}":
     get:
       description: "Get the usd price for a fiat symbol"
