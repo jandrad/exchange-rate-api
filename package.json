@@ -9,9 +9,6 @@
         "build": "wrangler build",
         "deploy": "wrangler publish"
     },
-    "dependencies": {
-        "@nefty/use": "^0.1.14"
-    },
     "devDependencies": {
         "@cloudflare/workers-types": "^4.20240614.0",
         "@types/node": "^20.14.5",

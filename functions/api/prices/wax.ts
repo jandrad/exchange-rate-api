@@ -1,4 +1,5 @@
-import { cors, config } from "../../../lib";
+import { cors } from "../../../lib";
+import { config } from "../../../config";
 
 async function prices(): Promise<Response> {
     try {

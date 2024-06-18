@@ -1,5 +1,6 @@
-import { useFetch, useSWR, useSearch } from "@nefty/use";
-import { isError, cors, config, getURLParameters } from "../../../lib";
+import { cors, useFetch, useSWR, useSearch } from "../../../lib";
+import { config } from "../../../config";
+import { isError, getURLParameters } from "../../../utils";
 
 const pageSize = 50;
 let searchEngine: ReturnType<typeof useSearch>;
