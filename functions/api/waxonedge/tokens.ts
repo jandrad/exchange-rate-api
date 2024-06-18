@@ -1,5 +1,5 @@
-import { cors, useFetch, useSWR, useSearch } from "../../../lib";
 import { config } from "../../../config";
+import { cors, useFetch, useSWR, useSearch } from "../../../lib";
 import { isError, getURLParameters } from "../../../utils";
 
 const pageSize = 50;

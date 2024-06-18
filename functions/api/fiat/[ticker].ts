@@ -1,4 +1,4 @@
-import cors from "../../../lib/cors";
+import { cors } from "../../../lib";
 
 async function rate(apiKey: string, symbol?: string | null): Promise<Response> {
     try {
