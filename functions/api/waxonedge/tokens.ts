@@ -1,15 +1,16 @@
 import { config } from "../../../config";
-import { cors, useFetch, useSWR, useSearch } from "../../../lib";
-import { isError, getURLParameters } from "../../../utils";
+import { cors, useFetch, useSearch } from "../../../lib";
+import { isError, getURLParameters, timestamp, validTimestamp } from "../../../utils";
 
 const pageSize = 50;
-let searchEngine: ReturnType<typeof useSearch>;
 
 async function tokens({
+    env,
     search,
     page = 1,
     preset,
 }: {
+    env: KVNamespace;
     search?: string;
     page: number;
     preset?: string;
@@ -17,61 +18,71 @@ async function tokens({
     const result: TokenList[] = [];
 
     try {
-        const data = await useSWR<Record<string, TokenList>>(
-            "waxonedge-tokens",
-            async () => {
-                const { data } = await useFetch<TokenApi[]>("/tokens", {
-                    baseUrl: config.WAXONEDGE_API,
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                });
+        let tokens = null;
 
-                if (!data) return {};
+        const store = await env.get("WAXONEDGE_API_TOKENS");
+        const parsed = store ? JSON.parse(store) : null;
 
-                const tokens = filterTokens(data);
-                const tokenNames = Object.keys(tokens);
+        if (parsed && validTimestamp(parsed.timestamp)) tokens = parsed.data;
 
-                searchEngine = useSearch({
-                    items: tokenNames,
-                    options: {
-                        distance: 2,
-                        results_count: 10,
-                        results_count_alt: 5,
-                    },
-                });
+        if (!tokens) {
+            const { data, error } = await useFetch<TokenApi[]>("/tokens", {
+                baseUrl: config.WAXONEDGE_API,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
 
-                return tokens;
-            },
-            120_000
-        );
+            if (error) return isError(error);
+            if (!data) return new Response("No data found", { status: 404 });
+
+            tokens = filterTokens(data);
+
+            await env.put(
+                "WAXONEDGE_API_TOKENS",
+                JSON.stringify({
+                    timestamp: timestamp(60),
+                    data: tokens,
+                })
+            );
+        }
 
         if (search) {
+            const tokenNames = Object.keys(tokens);
+            const searchEngine = useSearch({
+                items: tokenNames,
+                options: {
+                    distance: 2,
+                    results_count: 10,
+                    results_count_alt: 5,
+                },
+            });
+
             const hits = searchEngine(search);
 
             for (let i = 0; i < hits.length; i++) {
-                result.push(data[hits[i]]);
+                result.push(tokens[hits[i]]);
             }
         } else if (preset) {
             const hits = preset.split(",");
 
             for (let i = 0; i < hits.length; i++) {
-                result.push(data[hits[i]]);
+                result.push(tokens[hits[i]]);
             }
 
-            const normal = Object.keys(data).slice((page - 1) * pageSize, page * pageSize);
+            const normal = Object.keys(tokens).slice((page - 1) * pageSize, page * pageSize);
 
             // filter by preset
             for (let i = 0; i < normal.length; i++) {
                 if (!hits.includes(normal[i])) {
-                    result.push(data[normal[i]]);
+                    result.push(tokens[normal[i]]);
                 }
             }
         } else {
-            const hits = Object.keys(data).slice((page - 1) * pageSize, page * pageSize);
+            const hits = Object.keys(tokens).slice((page - 1) * pageSize, page * pageSize);
 
             for (let i = 0; i < hits.length; i++) {
-                result.push(data[hits[i]]);
+                result.push(tokens[hits[i]]);
             }
         }
 
@@ -83,10 +94,15 @@ async function tokens({
     }
 }
 
-export const onRequestGet: PagesFunction = async ({ request }) => {
+interface Env {
+    ERA: KVNamespace;
+}
+
+export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const { search, page, preset } = getURLParameters(request.url);
 
     const res = await tokens({
+        env: env.ERA,
         search,
         page,
         preset,
