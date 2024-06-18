@@ -1,14 +1,14 @@
-import cors from '../../../lib/cors'
+import cors from "../../../lib/cors";
 
 async function prices(): Promise<Response> {
     try {
         const [{ rows: waxRows }, woePrices] = await Promise.all([
             fetch(`https://wax.neftyblocks.com/v1/chain/get_table_rows`, {
-                method: 'POST',
-                redirect: 'follow',
+                method: "POST",
+                redirect: "follow",
                 headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'request',
+                    "Content-Type": "application/json",
+                    "User-Agent": "request",
                 },
                 body: JSON.stringify({
                     index_position: 3,
@@ -23,12 +23,12 @@ async function prices(): Promise<Response> {
                 }),
             }).then((r) => r.json()),
             fetch(`https://mev-api.waxonedge.app/tokens`, {
-                method: 'GET',
-                redirect: 'follow',
+                method: "GET",
+                redirect: "follow",
                 headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'request',
-                }
+                    "Content-Type": "application/json",
+                    "User-Agent": "request",
+                },
             }).then((r) => r.json()),
         ]);
 
@@ -42,18 +42,18 @@ async function prices(): Promise<Response> {
             }
         }
 
-        return new Response(JSON.stringify(prices), { headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=30', 'content-type': 'application/json'}, });
+        return new Response(JSON.stringify(prices), {
+            headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=30", "content-type": "application/json" },
+        });
     } catch (error) {
         if (error instanceof Error) {
             return new Response(error.message, { status: 500 });
         }
-        return new Response('Unknown error', { status: 500 });
+        return new Response("Unknown error", { status: 500 });
     }
 }
 
-
-
-export const onRequestGet: PagesFunction = async({ request, params }) => {
+export const onRequestGet: PagesFunction = async ({ request, params }) => {
     const res = await prices();
     return cors(request, res);
 };

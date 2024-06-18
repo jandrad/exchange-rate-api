@@ -1,78 +1,75 @@
 swagger: "2.0"
 info:
-  title: Rates API
-  description: "Get exchange rates and token information"
-  version: "1.0.0"
+    title: Rates API
+    description: "Get exchange rates and token information"
+    version: "1.0.0"
 schemes:
-  - "https"
-  - "http"
+    - "https"
+    - "http"
 paths:
-  "/api/logos/{chain}":
-    get:
-      description: "Get the token logos form a chain"
-      parameters:
-        -
-          name: chain
-          in: path
-          required: true
-          type: string
-          example: wax
-      responses:
-        200:
-          description: "Success."
-          schema:
-            type: object
-        404:
-          description: "No tokens found"
-        500:
-          description: "Internal server error"
-  "/api/prices/wax":
-    get:
-      description: "Get the token and prices in wax"
-      responses:
-        200:
-          description: "Success."
-          schema:
-            type: object
-        404:
-          description: "No tokens found"
-        500:
-          description: "Internal server error"
-  "/api/fiat/{ticker}":
-    get:
-      description: "Get the usd price for a fiat symbol"
-      parameters:
-        -
-          name: ticker
-          in: path
-          required: true
-          type: string
-          example: cop
-      responses:
-        200:
-          description: "Success."
-          schema:
-            type: string
-        404:
-          description: "No rate found"
-        500:
-          description: "Internal server error"
-  "/api/crypto/{ticker}":
-    get:
-      description: "Get the usd price for a crypto symbol"
-      parameters:
-        -
-          name: ticker
-          in: path
-          required: true
-          type: string
-          example: eth
-      responses:
-        200:
-          description: "Success."
-          schema:
-            type: string
-        404:
-          description: "No rate found"
-        500:
-          description: "Internal server error"
+    "/api/logos/{chain}":
+        get:
+            description: "Get the token logos form a chain"
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  type: string
+                  example: wax
+            responses:
+                200:
+                    description: "Success."
+                    schema:
+                        type: object
+                404:
+                    description: "No tokens found"
+                500:
+                    description: "Internal server error"
+    "/api/prices/wax":
+        get:
+            description: "Get the token and prices in wax"
+            responses:
+                200:
+                    description: "Success."
+                    schema:
+                        type: object
+                404:
+                    description: "No tokens found"
+                500:
+                    description: "Internal server error"
+    "/api/fiat/{ticker}":
+        get:
+            description: "Get the usd price for a fiat symbol"
+            parameters:
+                - name: ticker
+                  in: path
+                  required: true
+                  type: string
+                  example: cop
+            responses:
+                200:
+                    description: "Success."
+                    schema:
+                        type: string
+                404:
+                    description: "No rate found"
+                500:
+                    description: "Internal server error"
+    "/api/crypto/{ticker}":
+        get:
+            description: "Get the usd price for a crypto symbol"
+            parameters:
+                - name: ticker
+                  in: path
+                  required: true
+                  type: string
+                  example: eth
+            responses:
+                200:
+                    description: "Success."
+                    schema:
+                        type: string
+                404:
+                    description: "No rate found"
+                500:
+                    description: "Internal server error"
