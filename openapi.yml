@@ -73,3 +73,19 @@ paths:
                     description: "No rate found"
                 500:
                     description: "Internal server error"
+    "/api/waxonedge/tokens":
+        get:
+            description: "Get the list of tokens on waxonedge"
+            parameters:
+                - name: preset
+                  in: query
+                  required: false
+                  type: string
+                  example: wuf,wax,nefty
+            responses:
+                200:
+                    description: "Success."
+                    schema:
+                        type: object
+                500:
+                    description: "Internal server error"

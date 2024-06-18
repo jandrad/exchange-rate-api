@@ -1,9 +1,9 @@
-import cors from "../../../lib/cors";
+import { cors, config } from "../../../lib";
 
 async function prices(): Promise<Response> {
     try {
         const [{ rows: waxRows }, woePrices] = await Promise.all([
-            fetch(`https://wax.neftyblocks.com/v1/chain/get_table_rows`, {
+            fetch(`${config.CHAIN_API}/v1/chain/get_table_rows`, {
                 method: "POST",
                 redirect: "follow",
                 headers: {
@@ -22,7 +22,7 @@ async function prices(): Promise<Response> {
                     show_payer: false,
                 }),
             }).then((r) => r.json()),
-            fetch(`https://mev-api.waxonedge.app/tokens`, {
+            fetch(`${config.WAXONEDGE_API}/tokens`, {
                 method: "GET",
                 redirect: "follow",
                 headers: {
