@@ -41,7 +41,8 @@ async function tokens({
             await env.put(
                 "WAXONEDGE_API_TOKENS",
                 JSON.stringify({
-                    timestamp: timestamp(60),
+                    // cache for 1 hour
+                    timestamp: timestamp(3600),
                     data: tokens,
                 })
             );
@@ -64,10 +65,10 @@ async function tokens({
                 result.push(tokens[hits[i]]);
             }
         } else if (preset) {
-            const hits = preset.split(",");
+            const hits = preset.split("%2C");
 
             for (let i = 0; i < hits.length; i++) {
-                result.push(tokens[hits[i]]);
+                if (tokens[hits[i]]) result.push(tokens[hits[i]]);
             }
 
             const normal = Object.keys(tokens).slice((page - 1) * pageSize, page * pageSize);
@@ -87,7 +88,7 @@ async function tokens({
         }
 
         return new Response(JSON.stringify(result), {
-            headers: { "Cache-Control": "s-maxage=60", "content-type": "application/json" },
+            headers: { "Cache-Control": "s-maxage=3600", "content-type": "application/json" },
         });
     } catch (error) {
         return isError(error);
@@ -130,7 +131,7 @@ const filterTokens = (tokens: TokenApi[]): Record<string, TokenList> => {
                 out: { ticker: vstoken.symbol.ticker, contract: vstoken.contract, precision: vstoken.symbol.precision },
             };
 
-            results[`${symbol.ticker}_${contract}`] = tokens;
+            results[`${contract}_${symbol.ticker}`] = tokens;
         }
     }
 

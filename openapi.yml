@@ -16,6 +16,11 @@ paths:
                   required: true
                   type: string
                   example: wax
+                - name: token
+                  in: query
+                  required: false
+                  type: string
+                  example: WAX@eosio.token
             responses:
                 200:
                     description: "Success."

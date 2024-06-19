@@ -30,6 +30,7 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | 
 export interface UseFetchArgs {
     method?: HttpMethod;
     headers?: HeadersInit;
+    redirect?: RequestInit["redirect"];
     baseUrl?: string;
     body?: Record<string, unknown>;
     params?: Record<string, string>;
@@ -39,6 +40,7 @@ export interface UseFetchArgs {
 export const useFetch = async <T = unknown>(url: string, args?: UseFetchArgs): Promise<UseFetchReturn<T>> => {
     const options: RequestInit = {
         method: args?.method || "GET",
+        redirect: args?.redirect || "follow",
         headers: args?.headers || undefined,
         body: args?.body ? JSON.stringify(args.body) : undefined,
     };
