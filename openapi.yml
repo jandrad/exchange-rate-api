@@ -86,7 +86,17 @@ paths:
                   in: query
                   required: false
                   type: string
-                  example: wuf,wax,nefty
+                  example: eosio.token_WAX,token.nefty_NEFTY
+                - name: page
+                  in: query
+                  required: false
+                  type: number
+                  example: 1
+                - name: search
+                  in: query
+                  required: false
+                  type: string
+                  example: wax
             responses:
                 200:
                     description: "Success."
