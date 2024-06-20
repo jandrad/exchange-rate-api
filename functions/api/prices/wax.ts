@@ -78,7 +78,7 @@ interface Env {
     ERA: KVNamespace;
 }
 
-export const onRequestGet: PagesFunction<Env> = async ({ request, params }) => {
-    const res = await prices();
+export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+    const res = await prices(env.ERA);
     return cors(request, res);
 };
