@@ -73,12 +73,15 @@ async function tokens({
                 if (tokens[hits[i]]) result.push(tokens[hits[i]]);
             }
 
-            const normal = Object.keys(tokens).slice((page - 1) * limit, page * limit);
+            // if limit is not hit yet fill more
+            if (result.length < limit) {
+                const normal = Object.keys(tokens).slice((page - 1) * limit, page * limit);
 
-            // filter by preset
-            for (let i = 0; i < normal.length; i++) {
-                if (!hits.includes(normal[i])) {
-                    result.push(tokens[normal[i]]);
+                // filter by preset
+                for (let i = 0; i < normal.length; i++) {
+                    if (!hits.includes(normal[i])) {
+                        result.push(tokens[normal[i]]);
+                    }
                 }
             }
         } else {
