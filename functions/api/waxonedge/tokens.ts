@@ -9,11 +9,13 @@ async function tokens({
     search,
     page = 1,
     preset,
+    limit = pageSize,
 }: {
     env: KVNamespace;
     search?: string;
     page: number;
     preset?: string;
+    limit: number;
 }): Promise<Response> {
     const result: TokenList[] = [];
 
@@ -71,7 +73,7 @@ async function tokens({
                 if (tokens[hits[i]]) result.push(tokens[hits[i]]);
             }
 
-            const normal = Object.keys(tokens).slice((page - 1) * pageSize, page * pageSize);
+            const normal = Object.keys(tokens).slice((page - 1) * limit, page * limit);
 
             // filter by preset
             for (let i = 0; i < normal.length; i++) {
@@ -80,7 +82,7 @@ async function tokens({
                 }
             }
         } else {
-            const hits = Object.keys(tokens).slice((page - 1) * pageSize, page * pageSize);
+            const hits = Object.keys(tokens).slice((page - 1) * limit, page * limit);
 
             for (let i = 0; i < hits.length; i++) {
                 result.push(tokens[hits[i]]);
@@ -100,13 +102,14 @@ interface Env {
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
-    const { search, page, preset } = getURLParameters(request.url);
+    const { search, page, preset, limit } = getURLParameters(request.url);
 
     const res = await tokens({
         env: env.ERA,
         search,
         page,
         preset,
+        limit,
     });
 
     return cors(request, res);
@@ -116,7 +119,7 @@ const filterTokens = (tokens: TokenApi[]): Record<string, TokenList> => {
     const results: Record<string, TokenList> = {};
 
     for (let i = 0; i < tokens.length; i++) {
-        const { symbol, contract, in_pool, wax_price } = tokens[i];
+        const { symbol, contract, in_pool } = tokens[i];
 
         const maxPool = in_pool.length > 0 ? in_pool.reduce((a, b) => (a.quote_amount > b.quote_amount ? a : b)) : null;
 
@@ -126,7 +129,6 @@ const filterTokens = (tokens: TokenApi[]): Record<string, TokenList> => {
             const tokens: TokenList = {
                 pair_id: maxPool.pairid,
                 exchange: maxPool.src,
-                wax_price,
                 in: { ticker: symbol.ticker, contract: contract, precision: symbol.precision },
                 out: { ticker: vstoken.symbol.ticker, contract: vstoken.contract, precision: vstoken.symbol.precision },
             };
@@ -165,7 +167,6 @@ type TokenApi = {
 
 type TokenList = {
     pair_id: number;
-    wax_price: number;
     exchange: string;
     in: TokenItem;
     out: TokenItem;
