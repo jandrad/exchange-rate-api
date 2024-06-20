@@ -88,7 +88,7 @@ async function tokens({
         }
 
         return new Response(JSON.stringify(result), {
-            headers: { "Cache-Control": "s-maxage=3600", "content-type": "application/json" },
+            headers: { "Cache-Control": "s-maxage=1800", "content-type": "application/json" },
         });
     } catch (error) {
         return isError(error);
