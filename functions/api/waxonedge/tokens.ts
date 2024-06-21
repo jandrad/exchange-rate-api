@@ -51,7 +51,7 @@ async function tokens({
         }
 
         if (search) {
-            const tokenNames = Object.keys(tokens);
+            const tokenNames = Object.keys(tokens).map((key) => tokens[key].in.ticker);
             const searchEngine = useSearch({
                 items: tokenNames,
                 options: {
