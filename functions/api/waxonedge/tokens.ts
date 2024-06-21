@@ -51,13 +51,13 @@ async function tokens({
         }
 
         if (search) {
-            const tokenNames = Object.keys(tokens).map((key) => tokens[key].in.ticker);
+            const tokenNames = Object.keys(tokens);
             const searchEngine = useSearch({
                 items: tokenNames,
                 options: {
                     distance: 2,
-                    results_count: 10,
-                    results_count_alt: 5,
+                    results_count: 20,
+                    results_count_alt: 10,
                 },
             });
 
