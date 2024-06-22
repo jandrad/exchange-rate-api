@@ -1,15 +1,16 @@
 import { config } from "../../../config";
 import { cors, useFetch, useSearch } from "../../../lib";
 import { isError, getURLParameters, timestamp, validTimestamp } from "../../../utils";
+import { getAllLogos } from "../logos/[chain]";
 
 const pageSize = 50;
 
 async function tokens({
     env,
     search,
-    page = 1,
+    page,
     preset,
-    limit = pageSize,
+    limit,
 }: {
     env: KVNamespace;
     search?: string;
@@ -28,17 +29,25 @@ async function tokens({
         if (parsed && validTimestamp(parsed.timestamp)) tokens = parsed.data;
 
         if (!tokens) {
-            const { data, error } = await useFetch<TokenApi[]>("/tokens", {
-                baseUrl: config.WAXONEDGE_API,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            });
+            const [tokensPromise, logosPromise] = await Promise.allSettled([
+                useFetch<TokenApi[]>("/tokens", {
+                    baseUrl: config.WAXONEDGE_API,
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }),
+                getAllLogos({ env, chain: "wax" }),
+            ]);
 
+            const { data, error } =
+                tokensPromise.status === "fulfilled"
+                    ? tokensPromise.value
+                    : { data: null, error: tokensPromise.reason };
             if (error) return isError(error);
             if (!data) return new Response("No data found", { status: 404 });
 
-            tokens = filterTokens(data);
+            const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
+            tokens = filterTokens(data, logos);
 
             await env.put(
                 "WAXONEDGE_API_TOKENS",
@@ -110,15 +119,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const res = await tokens({
         env: env.ERA,
         search,
-        page,
+        page: page ? +page : 1,
         preset,
-        limit,
+        limit: limit ? +limit : pageSize,
     });
 
     return cors(request, res);
 };
 
-const filterTokens = (tokens: TokenApi[]): Record<string, TokenList> => {
+const filterTokens = (
+    tokens: TokenApi[],
+    logos: Record<string, { logo_lg: string }> = {}
+): Record<string, TokenList> => {
     const results: Record<string, TokenList> = {};
 
     for (let i = 0; i < tokens.length; i++) {
@@ -132,8 +144,18 @@ const filterTokens = (tokens: TokenApi[]): Record<string, TokenList> => {
             const tokens: TokenList = {
                 pair_id: maxPool.pairid,
                 exchange: maxPool.src,
-                in: { ticker: symbol.ticker, contract: contract, precision: symbol.precision },
-                out: { ticker: vstoken.symbol.ticker, contract: vstoken.contract, precision: vstoken.symbol.precision },
+                in: {
+                    ticker: symbol.ticker,
+                    contract: contract,
+                    precision: symbol.precision,
+                    logo: logos[`${symbol.ticker}@${contract}`]?.logo_lg,
+                },
+                out: {
+                    ticker: vstoken.symbol.ticker,
+                    contract: vstoken.contract,
+                    precision: vstoken.symbol.precision,
+                    logo: logos[`${vstoken.symbol.ticker}@${vstoken.contract}`]?.logo_lg,
+                },
             };
 
             results[`${contract}_${symbol.ticker}`] = tokens;
@@ -179,4 +201,5 @@ type TokenItem = {
     ticker: string;
     contract: string;
     precision: number;
+    logo?: string;
 };

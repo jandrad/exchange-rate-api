@@ -148,6 +148,40 @@ async function getLaunchbagzLogos(env: KVNamespace, chain: string, url?: string)
     return logos;
 }
 
+export async function getAllLogos({
+    env,
+    chain,
+}: {
+    env: KVNamespace;
+    chain: string;
+}): Promise<Record<string, { logo: string; logo_lg: string }>> {
+    let mainChain = chain;
+    let launchbagzUrl = chain.includes("wax") ? config.NEFTY_API : undefined;
+
+    if (chain.includes("test")) {
+        mainChain = chain.replace("testnet", "").replace("test", "");
+
+        if (launchbagzUrl) launchbagzUrl = config.NEFTY_API_TEST;
+    } else if (chain.includes("main")) {
+        mainChain = chain.replace("mainnet", "").replace("main", "");
+    }
+
+    const logos = (
+        await Promise.all([
+            getAlcorLogos(env, mainChain),
+            getEosCafeLogos(env, mainChain),
+            getLaunchbagzLogos(env, chain, launchbagzUrl),
+        ])
+    ).reduce(
+        (acc, curr) => ({
+            ...acc,
+            ...curr,
+        }),
+        {}
+    );
+    return logos;
+}
+
 async function tokens({
     env,
     token,
@@ -158,32 +192,8 @@ async function tokens({
     chain?: string | null;
 }): Promise<Response> {
     if (!chain) return new Response("No chain provided", { status: 400 });
-
     try {
-        let mainChain = chain;
-        let launchbagzUrl = chain.includes("wax") ? config.NEFTY_API : undefined;
-
-        if (chain.includes("test")) {
-            mainChain = chain.replace("testnet", "").replace("test", "");
-
-            if (launchbagzUrl) launchbagzUrl = config.NEFTY_API_TEST;
-        } else if (chain.includes("main")) {
-            mainChain = chain.replace("mainnet", "").replace("main", "");
-        }
-
-        const logos = (
-            await Promise.all([
-                getAlcorLogos(env, mainChain),
-                getEosCafeLogos(env, mainChain),
-                getLaunchbagzLogos(env, chain, launchbagzUrl),
-            ])
-        ).reduce(
-            (acc, curr) => ({
-                ...acc,
-                ...curr,
-            }),
-            {}
-        );
+        const logos = await getAllLogos({ env, chain });
 
         if (token) {
             if (logos[token])
