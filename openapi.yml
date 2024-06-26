@@ -125,3 +125,52 @@ paths:
                         type: object
                 500:
                     description: "Internal server error"
+    "/api/swap/routes":
+        get:
+            description: "Get routes to swap"
+            parameters:
+                - name: token_in
+                  in: query
+                  required: true
+                  type: string
+                  example: WAX_eosio.token
+                - name: token_out
+                  in: query
+                  required: true
+                  type: string
+                  example: NEFTY_token.nefty
+                - name: amount_in
+                  in: query
+                  required: true
+                  type: string
+                  example: "78118.583003"
+                - name: slippage
+                  in: query
+                  required: true
+                  type: string
+                  example: "500"
+                - name: receiver
+                  in: query
+                  required: true
+                  type: string
+                  example: "nefty"
+                - name: split_max_routes
+                  in: query
+                  required: false
+                  type: number
+                  example: 4
+                - name: filter_exchange
+                  in: query
+                  required: false
+                  type: string
+                - name: filter_type
+                  in: query
+                  required: false
+                  type: string
+            responses:
+                200:
+                    description: "Success."
+                    schema:
+                        type: object
+                500:
+                    description: "Internal server error"

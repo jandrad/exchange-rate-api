@@ -1,0 +1,314 @@
+import { config, getChainConfig } from "../../../config";
+import { cors, useFetch } from "../../../lib";
+import { isError, getURLParameters, validTimestamp, timestamp } from "../../../utils";
+
+const neftySwapContract = "swap.nefty";
+
+function parseToken(extendedAsset: { contract: string; quantity: string }): Token {
+    const { contract, quantity } = extendedAsset;
+    const [amountString, symbolCode] = quantity.split(" ");
+    const precision = amountString.split(".")[1]?.length || 0;
+    return {
+        symbol: {
+            ticker: symbolCode,
+            precision,
+        },
+        amount: amountString,
+        contract,
+    };
+}
+
+async function getNeftyPair({
+    tokenIn,
+    tokenOut,
+    env,
+    chain,
+}: {
+    chain: string;
+    tokenIn: string;
+    tokenOut: string;
+    env: KVNamespace;
+}): Promise<Pair | undefined> {
+    const store = await env.get("NEFTYSWAP_PAIRS");
+    const parsed = store ? JSON.parse(store) : null;
+
+    let pairs: Pair[] = [];
+    if (parsed && validTimestamp(parsed.timestamp)) {
+        pairs = parsed.data;
+    } else {
+        const { chainApiUrl } = getChainConfig(chain || "waxtest");
+        let lower_bound = undefined;
+        do {
+            const result = await useFetch<{ rows: PairRow[]; more: boolean; next_key: any }>(
+                "/v1/chain/get_table_rows",
+                {
+                    baseUrl: chainApiUrl,
+                    method: "POST",
+                    body: {
+                        code: neftySwapContract,
+                        scope: neftySwapContract,
+                        table: "pairs",
+                        lower_bound,
+                        limit: 1000,
+                        reverse: false,
+                        json: true,
+                        show_payer: false,
+                    },
+                }
+            );
+
+            if (result.error) throw result.error;
+            if (!result.data) throw new Error("No data found");
+
+            pairs = pairs.concat(
+                result.data.rows.map((row: PairRow) => ({
+                    reserve0: parseToken(row.reserve0),
+                    reserve1: parseToken(row.reserve1),
+                    total_liquidity: row.total_liquidity,
+                    code: row.code,
+                    active: row.active,
+                }))
+            );
+            if (result.data.more) {
+                lower_bound = result.data.next_key;
+            } else {
+                lower_bound = undefined;
+            }
+        } while (lower_bound);
+
+        await env.put(
+            "NEFTYSWAP_PAIRS",
+            JSON.stringify({
+                // cache for 1 hour
+                timestamp: timestamp(3600),
+                data: pairs,
+            })
+        );
+    }
+
+    const [tokenInSymbolCode, tokenInContract] = tokenIn.split("_");
+    const [tokenOutSymbolCode, tokenOutContract] = tokenOut.split("_");
+
+    const pair: Pair | undefined = pairs.find(
+        (p) =>
+            p.active &&
+            ((p.reserve0.symbol.ticker === tokenInSymbolCode &&
+                p.reserve1.symbol.ticker === tokenOutSymbolCode &&
+                p.reserve0.contract === tokenInContract &&
+                p.reserve1.contract === tokenOutContract) ||
+                (p.reserve0.symbol.ticker === tokenOutSymbolCode &&
+                    p.reserve1.symbol.ticker === tokenInSymbolCode &&
+                    p.reserve0.contract === tokenOutContract &&
+                    p.reserve1.contract === tokenInContract))
+    );
+    return pair;
+}
+
+async function getNeftyRoutes({ params, env }: { params: Record<string, any>; env: KVNamespace }): Promise<Route[]> {
+    const pair = await getNeftyPair({
+        tokenIn: params.token_in,
+        tokenOut: params.token_out,
+        env,
+        chain: params.chain,
+    });
+    if (!pair) {
+        return [];
+    }
+
+    const reserve0String = `${pair.reserve0.symbol.ticker}_${pair.reserve0.contract}`;
+    const inputSymbol = reserve0String === params.token_in ? pair.reserve0.symbol : pair.reserve1.symbol;
+    const outputSymbol = reserve0String === params.token_in ? pair.reserve1.symbol : pair.reserve0.symbol;
+    const inputAmount = +params.amount_in;
+    const minAmount = 0;
+
+    const route: Route = {
+        hash: `nefty_${pair.code}`,
+        route_price: 0,
+        fees: 0,
+        platform_fees: 0,
+        amount_in: inputAmount,
+        amount_received: 0,
+        amounts_received: [0],
+        minimum_received: 0,
+        minimums_received: [0],
+        actions: [
+            {
+                to: neftySwapContract,
+                quantity: `${inputAmount.toFixed(inputSymbol.precision)} ${inputSymbol.ticker}`,
+                memo: `min:${minAmount.toFixed(outputSymbol.precision).replaceAll(".", "")}swap:${
+                    pair.code
+                }:${inputAmount.toFixed(inputSymbol.precision)}`,
+            },
+        ],
+        type: "direct",
+    };
+
+    return [route];
+}
+
+async function getWoeRoutes({ params }: { params: Record<string, any> }): Promise<Route[]> {
+    const { data, error } = await useFetch<Route[]>(`${config.WAXONEDGE_API}/swapRoutes`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            "User-Agent": "request",
+        },
+        params: {
+            ...params,
+            limit: "10",
+        },
+    });
+
+    if (error) {
+        throw error;
+    }
+    if (!data) {
+        throw new Error("No data");
+    }
+    return data;
+}
+
+async function routes({ params, env }: { params: Record<string, any>; env: KVNamespace }): Promise<Response> {
+    try {
+        let routes: Route[] = [];
+        if (params.filter_exchange === "nefty") {
+            routes = await getNeftyRoutes({ params, env });
+        } else {
+            routes = await getWoeRoutes({ params });
+        }
+
+        const filteredData = routes.slice(0, 10).map((route) => ({
+            hash: route.hash,
+            route_price: route.route_price,
+            fees: route.fees,
+            platform_fees: route.platform_fees,
+            amount_in: route.amount_in,
+            amount_received: route.amount_received,
+            amounts_received: route.amounts_received,
+            minimum_received: route.minimum_received,
+            minimums_received: route.minimums_received,
+            actions: route.actions,
+            type: route.type,
+        }));
+
+        return new Response(JSON.stringify(filteredData), {
+            headers: { "Cache-Control": "s-maxage=1", "content-type": "application/json" },
+        });
+    } catch (error) {
+        return isError(error);
+    }
+}
+
+interface Env {
+    ERA: KVNamespace;
+}
+
+export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+    const params = getURLParameters(request.url);
+    const res = await routes({
+        params,
+        env: env.ERA,
+    });
+
+    return cors(request, res);
+};
+
+type Pair = {
+    code: string;
+    active: boolean;
+    reserve0: Token;
+    reserve1: Token;
+    total_liquidity: string;
+};
+
+type PairRow = {
+    code: string;
+    active: boolean;
+    reserve0: {
+        quantity: string;
+        contract: string;
+    };
+    reserve1: {
+        quantity: string;
+        contract: string;
+    };
+    total_liquidity: string;
+};
+
+type Route = {
+    hash: string;
+    exchanges?: string[];
+    markets?: Market[];
+    path?: [string[], boolean, string, string, string][];
+    pools?: Pool[];
+    poolsV3?: any[];
+    routeLiquidity?: Liquidity;
+    src_types?: string[];
+    srcedPath?: Path[];
+    route_price?: number;
+    type: string;
+    fees: number;
+    platform_fees: number;
+    amount_in: number;
+    amount_received: number;
+    amounts_received: number[];
+    minimum_received: number;
+    minimums_received: number[];
+    actions: Action[];
+};
+
+type Market = {
+    id: number;
+    src: string;
+    token0: Token;
+    token1: Token;
+    min_buy: number;
+    min_sell: number;
+    frozen: boolean;
+    fee: number;
+    lastPrice: number;
+    lastSide: string;
+    src_type: string;
+};
+
+type Token = {
+    symbol: Symbol;
+    amount: any;
+    contract: string;
+};
+
+type Symbol = {
+    ticker: string;
+    precision: number;
+};
+
+export type Pool = {
+    pairid: string;
+    src: string;
+    fee: number;
+    lptoken: Token;
+    token0: Token;
+    token1: Token;
+    reserve0: number;
+    reserve1: number;
+    input_min_units: number;
+    price: number;
+    src_type: string;
+    update_num: number;
+};
+
+type Liquidity = {
+    input: number;
+    output: number;
+};
+
+type Path = {
+    type: string;
+    index: number;
+};
+
+type Action = {
+    to: string;
+    quantity: string;
+    memo: string;
+};
