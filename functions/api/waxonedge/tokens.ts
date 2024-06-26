@@ -65,8 +65,8 @@ async function tokens({
                 items: tokenNames,
                 options: {
                     distance: 2,
-                    results_count: 20,
-                    results_count_alt: 10,
+                    results_count: 50,
+                    results_count_alt: 20,
                 },
             });
 
