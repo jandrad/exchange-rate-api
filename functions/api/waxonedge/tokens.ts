@@ -76,7 +76,7 @@ async function tokens({
                 result.push(tokens[hits[i]]);
             }
         } else if (preset) {
-            const hits = preset.split("%2C");
+            const hits = preset.split(",");
 
             for (let i = 0; i < hits.length; i++) {
                 if (tokens[hits[i]]) result.push(tokens[hits[i]]);
