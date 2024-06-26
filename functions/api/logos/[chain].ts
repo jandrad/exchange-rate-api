@@ -1,4 +1,4 @@
-import { config } from "../../../config";
+import { config, getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
 import { getURLParameters, timestamp, validTimestamp } from "../../../utils";
 
@@ -155,17 +155,7 @@ export async function getAllLogos({
     env: KVNamespace;
     chain: string;
 }): Promise<Record<string, { logo: string; logo_lg: string }>> {
-    let mainChain = chain;
-    let launchbagzUrl = chain.includes("wax") ? config.NEFTY_API : undefined;
-
-    if (chain.includes("test")) {
-        mainChain = chain.replace("testnet", "").replace("test", "");
-
-        if (launchbagzUrl) launchbagzUrl = config.NEFTY_API_TEST;
-    } else if (chain.includes("main")) {
-        mainChain = chain.replace("mainnet", "").replace("main", "");
-    }
-
+    const { launchbagzUrl, mainChain } = getChainConfig(chain);
     const logos = (
         await Promise.all([
             getAlcorLogos(env, mainChain),

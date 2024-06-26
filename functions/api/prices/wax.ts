@@ -2,15 +2,15 @@ import { cors } from "../../../lib";
 import { config } from "../../../config";
 import { timestamp, validTimestamp } from "../../../utils";
 
-async function prices(env: KVNamespace): Promise<Response> {
-    try {
-        const store = await env.get("WAX_TOKEN_PRICES");
-        const parsed = store ? JSON.parse(store) : null;
+export async function getPrices(env: KVNamespace): Promise<Record<string, number>> {
+    const store = await env.get("WAX_TOKEN_PRICES");
+    const parsed = store ? JSON.parse(store) : null;
 
-        let prices: Record<string, number> = {};
+    let prices: Record<string, number> = {};
 
-        if (parsed && validTimestamp(parsed.timestamp)) prices = parsed.data;
-        else {
+    if (parsed && validTimestamp(parsed.timestamp)) prices = parsed.data;
+    else {
+        try {
             const [{ rows: waxRows }, woePrices] = await Promise.all([
                 fetch(`${config.CHAIN_API}/v1/chain/get_table_rows`, {
                     method: "POST",
@@ -58,8 +58,22 @@ async function prices(env: KVNamespace): Promise<Response> {
                     data: prices,
                 })
             );
+        } catch (error) {
+            console.error(error);
+            if (parsed) {
+                prices = parsed.data;
+            } else {
+                throw error;
+            }
         }
+    }
 
+    return prices;
+}
+
+async function prices(env: KVNamespace): Promise<Response> {
+    try {
+        const prices = await getPrices(env);
         return new Response(JSON.stringify(prices), {
             headers: {
                 "Cache-Control": "s-maxage=1800",

@@ -6,4 +6,32 @@ export const config = {
     NEFTY_IPFS: "https://ipfs.neftyblocks.io",
     GITHUB_FILES: "https://raw.githubusercontent.com",
     GITHUB_API: "https://api.github.com",
+    BALANCES_API: "https://lightapi-mainnet.neftyblocks.com/api/balances/wax",
+    BALANCES_API_TEST: "https://lightapi-testnet.neftyblocks.com/api/balances/waxtest",
+};
+
+export const getChainConfig = (
+    chain: string
+): {
+    mainChain: string;
+    launchbagzUrl?: string;
+    balanceUrl?: string;
+} => {
+    let launchbagzUrl = chain.includes("wax") ? config.NEFTY_API : undefined;
+    let balanceUrl = chain.includes("wax") ? config.BALANCES_API : undefined;
+    let mainChain = chain;
+
+    if (chain.includes("test")) {
+        mainChain = chain.replace("testnet", "").replace("test", "");
+        if (launchbagzUrl) launchbagzUrl = config.NEFTY_API_TEST;
+        if (balanceUrl) balanceUrl = config.BALANCES_API_TEST;
+    } else if (chain.includes("main")) {
+        mainChain = chain.replace("mainnet", "").replace("main", "");
+    }
+
+    return {
+        mainChain,
+        launchbagzUrl,
+        balanceUrl,
+    };
 };
