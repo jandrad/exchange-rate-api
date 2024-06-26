@@ -104,3 +104,24 @@ paths:
                         type: object
                 500:
                     description: "Internal server error"
+    "/api/balances/{chain}":
+        get:
+            description: "Get the balances of an account"
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  type: string
+                  example: wax
+                - name: account
+                  in: query
+                  required: true
+                  type: string
+                  example: alpacaworlds
+            responses:
+                200:
+                    description: "Success."
+                    schema:
+                        type: object
+                500:
+                    description: "Internal server error"

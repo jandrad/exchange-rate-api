@@ -1,7 +1,7 @@
-import { getChainConfig } from "../../../../config";
-import { cors, useFetch } from "../../../../lib";
-import { isError, getURLParameters } from "../../../../utils";
-import { getPrices } from "../../prices/wax";
+import { getChainConfig } from "../../../config";
+import { cors, useFetch } from "../../../lib";
+import { isError, getURLParameters } from "../../../utils";
+import { getPrices } from "../prices/wax";
 
 async function balances({
     env,
