@@ -194,6 +194,9 @@ async function routes({ params, env }: { params: Record<string, any>; env: KVNam
             minimums_received: route.minimums_received,
             actions: route.actions,
             type: route.type,
+            price_impact: route.route_price
+                ? Math.max(1 - route.amount_received / (route.amount_in / route.route_price), 0)
+                : 0,
         }));
 
         return new Response(JSON.stringify(filteredData), {
