@@ -70,9 +70,40 @@ async function tokens({
                 },
             });
 
-            const hits = searchEngine(search);
+            // const hits = searchEngine(search);
+            const hits = (
+                tokenNames
+                    .map((name) => {
+                        const [contract, symbol] = name.split("_");
+                        const closeSymbolScore = symbol.includes(search.toUpperCase()) ? 1 : 0;
+                        const closeContractScore = contract.includes(search.toLowerCase()) ? 1 : 0;
+                        const startsSymbolScore = symbol.startsWith(search.toUpperCase()) ? 2 : 0;
+                        const startsContractScore = contract.startsWith(search.toLowerCase()) ? 2 : 0;
+                        const exactMatch =
+                            symbol === search.toUpperCase() || search.toLocaleLowerCase() === contract ? 100 : 0;
+
+                        const totalScore =
+                            closeSymbolScore +
+                            closeContractScore +
+                            startsSymbolScore +
+                            startsContractScore +
+                            exactMatch;
+                        if (totalScore) {
+                            return {
+                                name,
+                                score: totalScore,
+                            };
+                        } else {
+                            return null;
+                        }
+                    })
+                    .filter((x) => !!x) as { name: string; score: number }[]
+            )
+                .sort((a, b) => b.score - a.score)
+                .map((x) => x.name);
 
             for (let i = 0; i < hits.length; i++) {
+                if (result.length >= limit) break;
                 result.push(tokens[hits[i]]);
             }
         } else if (preset) {

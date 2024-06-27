@@ -18,17 +18,7 @@ function parseToken(extendedAsset: { contract: string; quantity: string }): Toke
     };
 }
 
-async function getNeftyPair({
-    tokenIn,
-    tokenOut,
-    env,
-    chain,
-}: {
-    chain: string;
-    tokenIn: string;
-    tokenOut: string;
-    env: KVNamespace;
-}): Promise<Pair | undefined> {
+async function getNeftyPairs({ env, chain }: { chain: string; env: KVNamespace }): Promise<Pair[]> {
     const store = await env.get("NEFTYSWAP_PAIRS");
     const parsed = store ? JSON.parse(store) : null;
 
@@ -86,6 +76,21 @@ async function getNeftyPair({
         );
     }
 
+    return pairs;
+}
+
+async function getNeftyPair({
+    tokenIn,
+    tokenOut,
+    env,
+    chain,
+}: {
+    chain: string;
+    tokenIn: string;
+    tokenOut: string;
+    env: KVNamespace;
+}): Promise<Pair | undefined> {
+    const pairs = await getNeftyPairs({ chain, env });
     const [tokenInSymbolCode, tokenInContract] = tokenIn.split("_");
     const [tokenOutSymbolCode, tokenOutContract] = tokenOut.split("_");
 
