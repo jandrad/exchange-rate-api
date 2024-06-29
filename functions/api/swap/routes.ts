@@ -160,7 +160,7 @@ async function getWoeRoutes({ params }: { params: Record<string, any> }): Promis
         },
         params: {
             ...params,
-            limit: "10",
+            limit: "1",
         },
     });
 
@@ -173,14 +173,69 @@ async function getWoeRoutes({ params }: { params: Record<string, any> }): Promis
     return data;
 }
 
+async function getGlobalLiquidity({
+    token_in,
+    token_out,
+}: {
+    token_in: string;
+    token_out: string;
+}): Promise<{ token_in_amount: number; token_out_amount: number }> {
+    const { data, error } = await useFetch<PairSource[]>(
+        `${config.WAXONEDGE_API}/pairDirectSources/${token_in}/${token_out}`,
+        {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "User-Agent": "request",
+            },
+        }
+    );
+    if (error) {
+        throw error;
+    }
+    if (!data) {
+        throw new Error("No data");
+    }
+
+    let token_in_amount = 0;
+    let token_out_amount = 0;
+    for (const source of data) {
+        let in_amount = source.token0.amount;
+        let out_amount = source.token1.amount;
+        if (`${source.token0.symbol.ticker}_${source.token0.contract}` === token_out) {
+            in_amount = source.token1.amount;
+            out_amount = source.token0.amount;
+        }
+
+        if (in_amount && out_amount) {
+            token_in_amount += +in_amount;
+            token_out_amount += +out_amount;
+        }
+    }
+
+    return { token_in_amount, token_out_amount };
+}
+
+async function getAllRoutes({ params, env }: { params: Record<string, any>; env: KVNamespace }): Promise<Route[]> {
+    let routes: Route[] = [];
+    if (params.filter_exchange === "nefty") {
+        routes = await getNeftyRoutes({ params, env });
+    } else {
+        routes = await getWoeRoutes({ params });
+    }
+
+    return routes;
+}
+
 async function routes({ params, env }: { params: Record<string, any>; env: KVNamespace }): Promise<Response> {
     try {
-        let routes: Route[] = [];
-        if (params.filter_exchange === "nefty") {
-            routes = await getNeftyRoutes({ params, env });
-        } else {
-            routes = await getWoeRoutes({ params });
-        }
+        const [routes, globalLiquidity] = await Promise.all([
+            getAllRoutes({ params, env }),
+            getGlobalLiquidity({ token_in: params.token_in, token_out: params.token_out }),
+        ]);
+
+        const { token_in_amount, token_out_amount } = globalLiquidity;
+        const global_price = token_in_amount / token_out_amount;
 
         const filteredData = routes.slice(0, 1).map((route) => ({
             hash: route.hash,
@@ -197,10 +252,13 @@ async function routes({ params, env }: { params: Record<string, any>; env: KVNam
             price_impact: route.route_price
                 ? Math.max(1 - route.amount_received / (route.amount_in / route.route_price), 0)
                 : 0,
+            global_price_impact: global_price
+                ? Math.max(1 - route.amount_received / (route.amount_in / global_price), 0)
+                : 0,
         }));
 
         return new Response(JSON.stringify(filteredData), {
-            headers: { "Cache-Control": "s-maxage=1", "content-type": "application/json" },
+            headers: { "Cache-Control": "s-maxage=3", "content-type": "application/json" },
         });
     } catch (error) {
         return isError(error);
@@ -263,6 +321,15 @@ type Route = {
     minimum_received: number;
     minimums_received: number[];
     actions: Action[];
+};
+
+type PairSource = {
+    src: string;
+    src_type?: string;
+    pair_id?: string;
+    token0: Token;
+    token1: Token;
+    fee: number;
 };
 
 type Market = {
