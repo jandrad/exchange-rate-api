@@ -3,6 +3,7 @@ import { cors, useFetch } from "../../../lib";
 import { isError, getURLParameters, timestamp, validTimestamp } from "../../../utils";
 import { Pair, getAllNeftyPairs } from "../swap/routes";
 import { getAllLogos } from "../logos/[chain]";
+import { fetchCached } from "../../../utils/cache";
 
 const pageSize = 50;
 
@@ -45,15 +46,8 @@ function getTokenApisFromPairs(pairs: Pair[]): TokenApi[] {
 }
 
 async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string }): Promise<Record<string, TokenList>> {
-    let tokens: Record<string, TokenList> | undefined;
-
     const cacheKey = `NEFTY_API_TOKENS_${chain.toUpperCase()}`;
-    const store = await env.get(cacheKey);
-    const parsed = store ? JSON.parse(store) : null;
-
-    if (parsed && validTimestamp(parsed.timestamp)) tokens = parsed.data;
-
-    if (!tokens) {
+    return await fetchCached(cacheKey, env, 3600, false, async () => {
         const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
             getAllNeftyPairs({ chain }),
             useFetch<TaxAPI>("/launchbagz/v1/tokens", {
@@ -74,30 +68,12 @@ async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string 
         const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
 
         const taxs = transformTaxs(taxData);
-        tokens = filterTokens(data, taxs, logos);
-
-        await env.put(
-            cacheKey,
-            JSON.stringify({
-                // cache for 1 hour
-                timestamp: timestamp(3600),
-                data: tokens,
-            })
-        );
-    }
-
-    return tokens;
+        return filterTokens(data, taxs, logos);
+    });
 }
 
 async function getWaoTokens({ env }: { env: KVNamespace }): Promise<Record<string, TokenList>> {
-    let tokens: Record<string, TokenList> | undefined;
-
-    const store = await env.get("WAXONEDGE_API_TOKENS");
-    const parsed = store ? JSON.parse(store) : null;
-
-    if (parsed && validTimestamp(parsed.timestamp)) tokens = parsed.data;
-
-    if (!tokens) {
+    return await fetchCached("WAXONEDGE_API_TOKENS", env, 3600, false, async () => {
         const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
             useFetch<TokenApi[]>("/tokens", {
                 baseUrl: config.WAXONEDGE_API,
@@ -123,19 +99,8 @@ async function getWaoTokens({ env }: { env: KVNamespace }): Promise<Record<strin
         const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
 
         const taxs = transformTaxs(taxData);
-        tokens = filterTokens(data, taxs, logos);
-
-        await env.put(
-            "WAXONEDGE_API_TOKENS",
-            JSON.stringify({
-                // cache for 1 hour
-                timestamp: timestamp(3600),
-                data: tokens,
-            })
-        );
-    }
-
-    return tokens;
+        return filterTokens(data, taxs, logos);
+    });
 }
 
 async function tokens({

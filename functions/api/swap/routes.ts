@@ -1,6 +1,7 @@
 import { config, getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
 import { isError, getURLParameters } from "../../../utils";
+import { fetchCached } from "../../../utils/cache";
 
 const neftySwapContract = "swap.nefty";
 
@@ -29,21 +30,24 @@ export async function getAllNeftyPairs({
     let lower_bound = undefined;
     let pairs: Pair[] = [];
     do {
-        const result = await useFetch<{ rows: PairRow[]; more: boolean; next_key: any }>("/v1/chain/get_table_rows", {
-            baseUrl: chainApiUrl,
-            method: "POST",
-            body: {
-                code: neftySwapContract,
-                scope: neftySwapContract,
-                table: "pairs",
-                lower_bound,
-                limit: 1000,
-                reverse: false,
-                json: true,
-                show_payer: false,
-                ...options,
-            },
-        });
+        const result: { data: PairRowsResponse | null; error: Error | null } = await useFetch<PairRowsResponse>(
+            "/v1/chain/get_table_rows",
+            {
+                baseUrl: chainApiUrl,
+                method: "POST",
+                body: {
+                    code: neftySwapContract,
+                    scope: neftySwapContract,
+                    table: "pairs",
+                    lower_bound,
+                    limit: 1000,
+                    reverse: false,
+                    json: true,
+                    show_payer: false,
+                    ...options,
+                },
+            }
+        );
 
         if (result.error) throw result.error;
         if (!result.data) throw new Error("No data found");
@@ -66,27 +70,29 @@ export async function getAllNeftyPairs({
     return pairs;
 }
 
-export async function getNeftySwapFees({ chain }: { chain: string }): Promise<number> {
-    const { chainApiUrl } = getChainConfig(chain);
-    const result = await useFetch<{ rows: { key: string; value: string }[] }>("/v1/chain/get_table_rows", {
-        baseUrl: chainApiUrl,
-        method: "POST",
-        body: {
-            code: neftySwapContract,
-            scope: neftySwapContract,
-            table: "configs",
-            limit: 1000,
-            reverse: false,
-            json: true,
-            show_payer: false,
-        },
-    });
-    if (result.error) throw result.error;
-    if (!result.data) throw new Error("No data found");
+export async function getNeftySwapFees({ chain, env }: { chain: string; env: KVNamespace }): Promise<number> {
+    return await fetchCached(`NEFTY_SWAP_FEES_${chain.toLocaleUpperCase()}`, env, 3600 * 24, false, async () => {
+        const { chainApiUrl } = getChainConfig(chain);
+        const result = await useFetch<{ rows: { key: string; value: string }[] }>("/v1/chain/get_table_rows", {
+            baseUrl: chainApiUrl,
+            method: "POST",
+            body: {
+                code: neftySwapContract,
+                scope: neftySwapContract,
+                table: "configs",
+                limit: 1000,
+                reverse: false,
+                json: true,
+                show_payer: false,
+            },
+        });
+        if (result.error) throw result.error;
+        if (!result.data) throw new Error("No data found");
 
-    const protocolFee = result.data.rows.find((row) => row.key === "fee.protocol")?.value ?? "0";
-    const tradeFee = result.data.rows.find((row) => row.key === "fee.trade")?.value ?? "0";
-    return +protocolFee + +tradeFee;
+        const protocolFee = result.data.rows.find((row) => row.key === "fee.protocol")?.value ?? "0";
+        const tradeFee = result.data.rows.find((row) => row.key === "fee.trade")?.value ?? "0";
+        return +protocolFee + +tradeFee;
+    });
 }
 
 async function getNeftyRoute({
@@ -133,14 +139,14 @@ async function getNeftyRoute({
     return [...inPairs, ...outPairs];
 }
 
-async function getNeftyRoutes({ params }: { params: Record<string, any>; env: KVNamespace }): Promise<Route[]> {
+async function getNeftyRoutes({ params, env }: { params: Record<string, any>; env: KVNamespace }): Promise<Route[]> {
     const [pairs, fees] = await Promise.all([
         getNeftyRoute({
             tokenIn: params.token_in,
             tokenOut: params.token_out,
             chain: params.chain || "wax",
         }),
-        getNeftySwapFees({ chain: params.chain || "wax" }),
+        getNeftySwapFees({ chain: params.chain || "wax", env }),
     ]);
     if (!pairs.length) {
         return [];
@@ -444,4 +450,10 @@ type Action = {
     to: string;
     quantity: string;
     memo: string;
+};
+
+type PairRowsResponse = {
+    rows: PairRow[];
+    more: boolean;
+    next_key: any;
 };
