@@ -1,5 +1,5 @@
 import { config } from "../../../config";
-import { cors, useFetch, useSearch } from "../../../lib";
+import { cors, useFetch } from "../../../lib";
 import { isError, getURLParameters, timestamp, validTimestamp } from "../../../utils";
 import { getAllLogos } from "../logos/[chain]";
 
@@ -29,9 +29,15 @@ async function tokens({
         if (parsed && validTimestamp(parsed.timestamp)) tokens = parsed.data;
 
         if (!tokens) {
-            const [tokensPromise, logosPromise] = await Promise.allSettled([
+            const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
                 useFetch<TokenApi[]>("/tokens", {
                     baseUrl: config.WAXONEDGE_API,
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }),
+                useFetch<TaxAPI>("/launchbagz/v1/tokens", {
+                    baseUrl: config.NEFTY_API,
                     headers: {
                         "Content-Type": "application/json",
                     },
@@ -46,8 +52,11 @@ async function tokens({
             if (error) return isError(error);
             if (!data) return new Response("No data found", { status: 404 });
 
+            const taxData = taxPromise.status === "fulfilled" ? taxPromise.value.data?.data : [];
             const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
-            tokens = filterTokens(data, logos);
+
+            const taxs = transformTaxs(taxData);
+            tokens = filterTokens(data, taxs, logos);
 
             await env.put(
                 "WAXONEDGE_API_TOKENS",
@@ -61,16 +70,7 @@ async function tokens({
 
         if (search) {
             const tokenNames = Object.keys(tokens);
-            const searchEngine = useSearch({
-                items: tokenNames,
-                options: {
-                    distance: 2,
-                    results_count: 50,
-                    results_count_alt: 20,
-                },
-            });
 
-            // const hits = searchEngine(search);
             const hits = (
                 tokenNames
                     .map((name) => {
@@ -160,6 +160,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
 const filterTokens = (
     tokens: TokenApi[],
+    taxs: Record<string, number>,
     logos: Record<string, { logo_lg: string }> = {}
 ): Record<string, TokenList> => {
     const results: Record<string, TokenList> = {};
@@ -178,12 +179,14 @@ const filterTokens = (
                 in: {
                     ticker: symbol.ticker,
                     contract: contract,
+                    tax: taxs[`${contract}_${symbol.ticker}`] || 0,
                     precision: symbol.precision,
                     logo: logos[`${symbol.ticker}@${contract}`]?.logo_lg,
                 },
                 out: {
                     ticker: vstoken.symbol.ticker,
                     contract: vstoken.contract,
+                    tax: taxs[`${vstoken.symbol.ticker}_${vstoken.contract}`] || 0,
                     precision: vstoken.symbol.precision,
                     logo: logos[`${vstoken.symbol.ticker}@${vstoken.contract}`]?.logo_lg,
                 },
@@ -191,6 +194,17 @@ const filterTokens = (
 
             results[`${contract}_${symbol.ticker}`] = tokens;
         }
+    }
+
+    return results;
+};
+
+const transformTaxs = (taxs: Tax[] = []): Record<string, number> => {
+    const results: Record<string, number> = {};
+
+    for (let i = 0; i < taxs.length; i++) {
+        const { token_code, token_contract, tx_fee } = taxs[i];
+        results[`${token_contract}_${token_code}`] = tx_fee;
     }
 
     return results;
@@ -221,6 +235,25 @@ type TokenApi = {
     }[];
 };
 
+type TaxAPI = {
+    success: boolean;
+    message?: string;
+    data?: Tax[];
+    query_time: number;
+};
+
+type Tax = {
+    contract: string;
+    token_contract: string;
+    token_code: string;
+    image: string;
+    tx_fee: number;
+    created_at_time: string;
+    updated_at_time: string;
+    created_at_block: string;
+    updated_at_block: string;
+};
+
 type TokenList = {
     pair_id: number;
     exchange: string;
@@ -232,5 +265,6 @@ type TokenItem = {
     ticker: string;
     contract: string;
     precision: number;
+    tax: number;
     logo?: string;
 };
