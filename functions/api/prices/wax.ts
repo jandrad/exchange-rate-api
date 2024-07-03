@@ -31,7 +31,7 @@ export async function getPrices(env: KVNamespace): Promise<Record<string, number
                         show_payer: false,
                     }),
                 }).then((r) => r.json()),
-                fetch(`${config.WAXONEDGE_API}/tokens?minimaldata=true`, {
+                fetch(`${config.WAXONEDGE_API}/tokens`, {
                     method: "GET",
                     redirect: "follow",
                     headers: {
