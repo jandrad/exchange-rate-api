@@ -9,6 +9,7 @@ export const config = {
     GITHUB_API: "https://api.github.com",
     BALANCES_API: "https://lightapi-mainnet.neftyblocks.com/api/balances/wax",
     BALANCES_API_TEST: "https://lightapi-testnet.neftyblocks.com/api/balances/waxtest",
+    NEFTY_SWAP_FALLBACK: false,
 };
 
 export const getChainConfig = (
