@@ -1,6 +1,5 @@
 export const config = {
-    WAXONEDGE_API: "https://api01.waxonedge.app",
-    WAXONEDGE_API_BACKUP: "https://api02.waxonedge.app",
+    WAXONEDGE_API: "https://woe-api.neftyblocks.com",
     CHAIN_API: "https://wax.neftyblocks.com",
     CHAIN_API_TEST: "https://wax-testnet.neftyblocks.com",
     NEFTY_API: "https://aa.neftyblocks.com",
