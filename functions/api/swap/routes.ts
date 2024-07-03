@@ -1,6 +1,6 @@
 import { config, getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
-import { isError, getURLParameters, validTimestamp, timestamp } from "../../../utils";
+import { isError, getURLParameters } from "../../../utils";
 
 const neftySwapContract = "swap.nefty";
 
@@ -18,7 +18,13 @@ function parseToken(extendedAsset: { contract: string; quantity: string }): Toke
     };
 }
 
-export async function getAllNeftyPairs({ chain }: { chain: string }): Promise<Pair[]> {
+export async function getAllNeftyPairs({
+    chain,
+    options = {},
+}: {
+    chain: string;
+    options?: Record<string, any>;
+}): Promise<Pair[]> {
     const { chainApiUrl } = getChainConfig(chain);
     let lower_bound = undefined;
     let pairs: Pair[] = [];
@@ -35,6 +41,7 @@ export async function getAllNeftyPairs({ chain }: { chain: string }): Promise<Pa
                 reverse: false,
                 json: true,
                 show_payer: false,
+                ...options,
             },
         });
 
@@ -59,28 +66,6 @@ export async function getAllNeftyPairs({ chain }: { chain: string }): Promise<Pa
     return pairs;
 }
 
-async function getNeftyPairs({ env, chain }: { chain: string; env: KVNamespace }): Promise<Pair[]> {
-    const store = await env.get("NEFTY_SWAP_PAIRS");
-    const parsed = store ? JSON.parse(store) : null;
-
-    let pairs: Pair[] = [];
-    if (parsed && validTimestamp(parsed.timestamp)) {
-        pairs = parsed.data;
-    } else {
-        pairs = await getAllNeftyPairs({ chain });
-        await env.put(
-            "NEFTY_SWAP_PAIRS",
-            JSON.stringify({
-                // cache for 2 seconds
-                timestamp: timestamp(2),
-                data: pairs,
-            })
-        );
-    }
-
-    return pairs;
-}
-
 export async function getNeftySwapFees({ chain }: { chain: string }): Promise<number> {
     const { chainApiUrl } = getChainConfig(chain);
     const result = await useFetch<{ rows: { key: string; value: string }[] }>("/v1/chain/get_table_rows", {
@@ -99,80 +84,114 @@ export async function getNeftySwapFees({ chain }: { chain: string }): Promise<nu
     if (result.error) throw result.error;
     if (!result.data) throw new Error("No data found");
 
-    const protocolFee = result.data.rows.find((row) => row.key === "fee.protocol")?.value || "0";
-    const tradeFee = result.data.rows.find((row) => row.key === "fee.trade")?.value || "0";
+    const protocolFee = result.data.rows.find((row) => row.key === "fee.protocol")?.value ?? "0";
+    const tradeFee = result.data.rows.find((row) => row.key === "fee.trade")?.value ?? "0";
     return +protocolFee + +tradeFee;
 }
 
-async function getNeftyPair({
+async function getNeftyRoute({
     tokenIn,
     tokenOut,
-    env,
     chain,
 }: {
     chain: string;
     tokenIn: string;
     tokenOut: string;
-    env: KVNamespace;
-}): Promise<Pair | undefined> {
-    const pairs = await getNeftyPairs({ chain, env });
-    const [tokenInSymbolCode, tokenInContract] = tokenIn.split("_");
-    const [tokenOutSymbolCode, tokenOutContract] = tokenOut.split("_");
+}): Promise<Pair[]> {
+    const pairs = await getAllNeftyPairs({ chain });
+    const pairsMap: Record<string, Pair> = pairs
+        .filter((p) => p.active)
+        .reduce(
+            (acc, pair) => ({
+                ...acc,
+                [`${pair.reserve0.symbol.ticker}_${pair.reserve0.contract}-${pair.reserve1.symbol.ticker}_${pair.reserve1.contract}`]:
+                    pair,
+                [`${pair.reserve1.symbol.ticker}_${pair.reserve1.contract}-${pair.reserve0.symbol.ticker}_${pair.reserve0.contract}`]:
+                    pair,
+            }),
+            {}
+        );
 
-    const pair: Pair | undefined = pairs.find(
-        (p) =>
-            p.active &&
-            ((p.reserve0.symbol.ticker === tokenInSymbolCode &&
-                p.reserve1.symbol.ticker === tokenOutSymbolCode &&
-                p.reserve0.contract === tokenInContract &&
-                p.reserve1.contract === tokenOutContract) ||
-                (p.reserve0.symbol.ticker === tokenOutSymbolCode &&
-                    p.reserve1.symbol.ticker === tokenInSymbolCode &&
-                    p.reserve0.contract === tokenOutContract &&
-                    p.reserve1.contract === tokenInContract))
-    );
-    return pair;
+    const directRoute = pairsMap[`${tokenIn}-${tokenOut}`];
+    if (directRoute) {
+        return [directRoute];
+    }
+
+    // Find a route from tokenIn to tokenOut
+    const keys = Object.keys(pairsMap);
+    const inPairs: Pair[] = [];
+    const outPairs: Pair[] = [];
+    do {
+        const keyIn = keys.find((key) => key.split("-")[0] === tokenIn);
+        const keyOut = keys.find((key) => key.split("-")[1] === tokenOut);
+        if (!keyIn || !keyOut) return [];
+        inPairs.push(pairsMap[keyIn]);
+        outPairs.splice(0, 0, pairsMap[keyOut]);
+        tokenIn = keyIn.split("-")[1];
+        tokenOut = keyOut.split("-")[0];
+    } while (tokenIn !== tokenOut);
+    return [...inPairs, ...outPairs];
 }
 
-async function getNeftyRoutes({ params, env }: { params: Record<string, any>; env: KVNamespace }): Promise<Route[]> {
-    const [pair, fees] = await Promise.all([
-        getNeftyPair({
+async function getNeftyRoutes({ params }: { params: Record<string, any>; env: KVNamespace }): Promise<Route[]> {
+    const [pairs, fees] = await Promise.all([
+        getNeftyRoute({
             tokenIn: params.token_in,
             tokenOut: params.token_out,
-            env,
-            chain: params.chain,
+            chain: params.chain || "wax",
         }),
-        getNeftySwapFees({ chain: params.chain }),
+        getNeftySwapFees({ chain: params.chain || "wax" }),
     ]);
-    if (!pair) {
+    if (!pairs.length) {
         return [];
     }
 
-    const reserve0String = `${pair.reserve0.symbol.ticker}_${pair.reserve0.contract}`;
-    const inputReserve = reserve0String === params.token_in ? pair.reserve0 : pair.reserve1;
-    const outputReserve = reserve0String === params.token_in ? pair.reserve1 : pair.reserve0;
-    const inputAmount = +params.amount_in;
-    const inputReserveAmount = +inputReserve.amount;
-    const outputReserveAmount = +outputReserve.amount;
-    const routePrice = inputReserveAmount / outputReserveAmount;
     const fee = fees;
-    const inputWithFee = inputAmount - (inputAmount * fee) / 10000;
-    const outputAmount =
-        Math.floor(
-            ((inputWithFee * outputReserveAmount) / (inputReserveAmount + inputWithFee)) *
-                10 ** outputReserve.symbol.precision
-        ) /
-        10 ** outputReserve.symbol.precision;
+    const codes = [];
+    const inputSymbol = pairs[0].reserve0.symbol;
+    let routePrice = undefined;
+    let inputAmount = +params.amount_in;
+    let outputAmount = 0;
+    let outputPrecision = 0;
+    let tokenIn: string = params.token_in;
+
+    for (const pair of pairs) {
+        const reserve0String = `${pair.reserve0.symbol.ticker}_${pair.reserve0.contract}`;
+        const inputReserve = reserve0String === tokenIn ? pair.reserve0 : pair.reserve1;
+        const outputReserve = reserve0String === tokenIn ? pair.reserve1 : pair.reserve0;
+        const inputReserveAmount = +inputReserve.amount;
+        const outputReserveAmount = +outputReserve.amount;
+
+        // Fix
+        if (routePrice === undefined) {
+            routePrice = inputReserveAmount / outputReserveAmount;
+        } else {
+            routePrice = (routePrice * inputReserveAmount) / outputReserveAmount;
+        }
+        const inputWithFee = inputAmount - (inputAmount * fee) / 10000;
+        outputAmount =
+            Math.floor(
+                ((inputWithFee * outputReserveAmount) / (inputReserveAmount + inputWithFee)) *
+                    10 ** outputReserve.symbol.precision
+            ) /
+            10 ** outputReserve.symbol.precision;
+
+        inputAmount = outputAmount;
+        outputPrecision = outputReserve.symbol.precision;
+        tokenIn = `${outputReserve.symbol.ticker}_${outputReserve.contract}`;
+
+        codes.push(pair.code);
+    }
+
     const minAmount =
-        Math.floor(outputAmount * (1 - params.slippage / 10000) * 10 ** inputReserve.symbol.precision) /
-        10 ** inputReserve.symbol.precision;
+        Math.floor(outputAmount * (1 - params.slippage / 10000) * 10 ** outputPrecision) / 10 ** outputPrecision;
 
     const route: Route = {
-        hash: `neftyblocks_${pair.code}`,
+        hash: `neftyblocks_${codes.join("-")}`,
         route_price: routePrice,
-        fees: 30,
+        fees,
         platform_fees: 0,
-        amount_in: inputAmount,
+        amount_in: +params.amount_in,
         amount_received: outputAmount,
         amounts_received: [outputAmount],
         minimum_received: minAmount,
@@ -180,8 +199,8 @@ async function getNeftyRoutes({ params, env }: { params: Record<string, any>; en
         actions: [
             {
                 to: neftySwapContract,
-                quantity: `${inputAmount.toFixed(inputReserve.symbol.precision)} ${inputReserve.symbol.ticker}`,
-                memo: `swap:${pair.code},min:${minAmount.toFixed(outputReserve.symbol.precision).replaceAll(".", "")}`,
+                quantity: `${Number(params.amount_in).toFixed(inputSymbol.precision)} ${inputSymbol.ticker}`,
+                memo: `swap:${codes.join("-")},min:${Math.floor(minAmount * 10 ** outputPrecision)}`,
             },
         ],
         type: "direct",
@@ -258,7 +277,7 @@ async function getGlobalLiquidity({
 async function getAllRoutes({ params, env }: { params: Record<string, any>; env: KVNamespace }): Promise<Route[]> {
     let routes: Route[] = [];
     if (config.NEFTY_SWAP_FALLBACK) {
-        routes = await getNeftyRoutes({ params: { ...params, chain: "wax" }, env });
+        routes = await getNeftyRoutes({ params, env });
     } else {
         routes = await getWoeRoutes({ params });
     }

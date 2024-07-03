@@ -44,24 +44,25 @@ function getTokenApisFromPairs(pairs: Pair[]): TokenApi[] {
     return [...tokensMap.values()];
 }
 
-async function getNeftyTokens({ env }: { env: KVNamespace }): Promise<Record<string, TokenList>> {
+async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string }): Promise<Record<string, TokenList>> {
     let tokens: Record<string, TokenList> | undefined;
 
-    const store = await env.get("NEFTY_API_TOKENS");
+    const cacheKey = `NEFTY_API_TOKENS_${chain.toUpperCase()}`;
+    const store = await env.get(cacheKey);
     const parsed = store ? JSON.parse(store) : null;
 
     if (parsed && validTimestamp(parsed.timestamp)) tokens = parsed.data;
 
     if (!tokens) {
         const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
-            getAllNeftyPairs({ env, chain: "wax" }),
+            getAllNeftyPairs({ chain }),
             useFetch<TaxAPI>("/launchbagz/v1/tokens", {
                 baseUrl: config.NEFTY_API,
                 headers: {
                     "Content-Type": "application/json",
                 },
             }),
-            getAllLogos({ env, chain: "wax" }),
+            getAllLogos({ env, chain }),
         ]);
 
         if (tokensPromise.status === "rejected") {
@@ -76,7 +77,7 @@ async function getNeftyTokens({ env }: { env: KVNamespace }): Promise<Record<str
         tokens = filterTokens(data, taxs, logos);
 
         await env.put(
-            "NEFTY_API_TOKENS",
+            cacheKey,
             JSON.stringify({
                 // cache for 1 hour
                 timestamp: timestamp(3600),
@@ -143,19 +144,21 @@ async function tokens({
     page,
     preset,
     limit,
+    chain,
 }: {
     env: KVNamespace;
     search?: string;
     page: number;
     preset?: string;
     limit: number;
+    chain: string;
 }): Promise<Response> {
     const result: TokenList[] = [];
 
     try {
         let tokens: Record<string, TokenList>;
-        if (config.NEFTY_SWAP_FALLBACK) {
-            tokens = await getNeftyTokens({ env });
+        if (config.NEFTY_SWAP_FALLBACK || chain.includes("test")) {
+            tokens = await getNeftyTokens({ env, chain });
         } else {
             tokens = await getWaoTokens({ env });
         }
@@ -237,7 +240,7 @@ interface Env {
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
-    const { search, page, preset, limit } = getURLParameters(request.url);
+    const { search, page, preset, limit, chain } = getURLParameters(request.url);
 
     const res = await tokens({
         env: env.ERA,
@@ -245,6 +248,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         page: page ? +page : 1,
         preset,
         limit: limit ? +limit : pageSize,
+        chain: chain || "wax",
     });
 
     return cors(request, res);
