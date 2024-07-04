@@ -1,6 +1,6 @@
 import { config, getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
-import { isError, getURLParameters, reportWoeError, shouldFallbackToNeftyPools } from "../../../utils";
+import { isError, getURLParameters, shouldFallbackToNeftyPools, reportWoeResult } from "../../../utils";
 import { fetchCached } from "../../../utils/cache";
 
 const neftySwapContract = "swap.nefty";
@@ -298,8 +298,9 @@ async function getAllRoutes({ params, env }: { params: Record<string, any>; env:
     } else {
         try {
             routes = await getWoeRoutes({ params });
+            await reportWoeResult(env, true);
         } catch (error) {
-            await reportWoeError(env);
+            await reportWoeResult(env, false);
             throw error;
         }
     }
