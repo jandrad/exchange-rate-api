@@ -1,6 +1,6 @@
 import { config } from "../../../config";
 import { cors, useFetch } from "../../../lib";
-import { isError, getURLParameters, timestamp, validTimestamp } from "../../../utils";
+import { isError, getURLParameters, shouldFallbackToNeftyPools } from "../../../utils";
 import { Pair, getAllNeftyPairs } from "../swap/routes";
 import { getAllLogos } from "../logos/[chain]";
 import { fetchCached } from "../../../utils/cache";
@@ -47,60 +47,78 @@ function getTokenApisFromPairs(pairs: Pair[]): TokenApi[] {
 
 async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string }): Promise<Record<string, TokenList>> {
     const cacheKey = `NEFTY_API_TOKENS_${chain.toUpperCase()}`;
-    return await fetchCached(cacheKey, env, 3600, false, async () => {
-        const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
-            getAllNeftyPairs({ chain }),
-            useFetch<TaxAPI>("/launchbagz/v1/tokens", {
-                baseUrl: config.NEFTY_API,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }),
-            getAllLogos({ env, chain }),
-        ]);
+    return await fetchCached(
+        async () => {
+            const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
+                getAllNeftyPairs({ chain }),
+                useFetch<TaxAPI>("/launchbagz/v1/tokens", {
+                    baseUrl: config.NEFTY_API,
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }),
+                getAllLogos({ env, chain }),
+            ]);
 
-        if (tokensPromise.status === "rejected") {
-            throw tokensPromise.reason;
+            if (tokensPromise.status === "rejected") {
+                throw tokensPromise.reason;
+            }
+
+            const data = getTokenApisFromPairs(tokensPromise.value);
+            const taxData = taxPromise.status === "fulfilled" ? taxPromise.value.data?.data : [];
+            const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
+
+            const taxs = transformTaxs(taxData);
+            return filterTokens(data, taxs, logos);
+        },
+        {
+            key: cacheKey,
+            env,
+            ttlSeconds: 1200,
+            fallbackToCache: false,
         }
-
-        const data = getTokenApisFromPairs(tokensPromise.value);
-        const taxData = taxPromise.status === "fulfilled" ? taxPromise.value.data?.data : [];
-        const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
-
-        const taxs = transformTaxs(taxData);
-        return filterTokens(data, taxs, logos);
-    });
+    );
 }
 
 async function getWaoTokens({ env }: { env: KVNamespace }): Promise<Record<string, TokenList>> {
-    return await fetchCached("WAXONEDGE_API_TOKENS", env, 3600, false, async () => {
-        const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
-            useFetch<TokenApi[]>("/tokens", {
-                baseUrl: config.WAXONEDGE_API,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }),
-            useFetch<TaxAPI>("/launchbagz/v1/tokens", {
-                baseUrl: config.NEFTY_API,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }),
-            getAllLogos({ env, chain: "wax" }),
-        ]);
+    return await fetchCached(
+        async () => {
+            const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
+                useFetch<TokenApi[]>("/tokens", {
+                    baseUrl: config.WAXONEDGE_API,
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }),
+                useFetch<TaxAPI>("/launchbagz/v1/tokens", {
+                    baseUrl: config.NEFTY_API,
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }),
+                getAllLogos({ env, chain: "wax" }),
+            ]);
 
-        const { data, error } =
-            tokensPromise.status === "fulfilled" ? tokensPromise.value : { data: null, error: tokensPromise.reason };
-        if (error) throw error;
-        if (!data) throw new Error("No data found");
+            const { data, error } =
+                tokensPromise.status === "fulfilled"
+                    ? tokensPromise.value
+                    : { data: null, error: tokensPromise.reason };
+            if (error) throw error;
+            if (!data) throw new Error("No data found");
 
-        const taxData = taxPromise.status === "fulfilled" ? taxPromise.value.data?.data : [];
-        const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
+            const taxData = taxPromise.status === "fulfilled" ? taxPromise.value.data?.data : [];
+            const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
 
-        const taxs = transformTaxs(taxData);
-        return filterTokens(data, taxs, logos);
-    });
+            const taxs = transformTaxs(taxData);
+            return filterTokens(data, taxs, logos);
+        },
+        {
+            key: "WAXONEDGE_API_TOKENS",
+            env,
+            ttlSeconds: 3600,
+            fallbackToCache: false,
+        }
+    );
 }
 
 async function tokens({
@@ -122,7 +140,8 @@ async function tokens({
 
     try {
         let tokens: Record<string, TokenList>;
-        if (config.NEFTY_SWAP_FALLBACK || chain.includes("test")) {
+        const fallback = await shouldFallbackToNeftyPools(env);
+        if (fallback || chain.includes("test")) {
             tokens = await getNeftyTokens({ env, chain });
         } else {
             tokens = await getWaoTokens({ env });

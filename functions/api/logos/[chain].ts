@@ -5,106 +5,129 @@ import { fetchCached } from "../../../utils/cache";
 
 async function getEosCafeLogos(env: KVNamespace, chain: string): Promise<Record<string, any>> {
     const cacheId = `NEFTY_${chain.toUpperCase()}_LOGOS_EOSCAFE`;
-    return await fetchCached(cacheId, env, 3600, true, async () => {
-        const { data, error } = await useFetch<{ logo: string; logo_lg: string; symbol: string; account: string }[]>(
-            "/eoscafe/eos-airdrops/master/tokens.json",
-            {
+    return await fetchCached(
+        async () => {
+            const { data, error } = await useFetch<
+                { logo: string; logo_lg: string; symbol: string; account: string }[]
+            >("/eoscafe/eos-airdrops/master/tokens.json", {
                 baseUrl: config.GITHUB_FILES,
                 headers: {
                     "Content-Type": "application/json",
                     "User-Agent": "request",
                 },
+            });
+
+            if (error) throw error;
+            if (!data) throw new Error("No data found");
+
+            const logos: Record<string, any> = {};
+            const filterData = data.filter((token: any) => token.chain === chain);
+
+            for (let i = 0; i < filterData.length; i++) {
+                const token = filterData[i];
+
+                logos[`${token.symbol}@${token.account}`] = {
+                    logo: token.logo,
+                    logo_lg: token.logo_lg,
+                };
             }
-        );
-
-        if (error) throw error;
-        if (!data) throw new Error("No data found");
-
-        const logos: Record<string, any> = {};
-        const filterData = data.filter((token: any) => token.chain === chain);
-
-        for (let i = 0; i < filterData.length; i++) {
-            const token = filterData[i];
-
-            logos[`${token.symbol}@${token.account}`] = {
-                logo: token.logo,
-                logo_lg: token.logo_lg,
-            };
+            return logos;
+        },
+        {
+            key: cacheId,
+            env,
+            ttlSeconds: 3600,
+            fallbackToCache: true,
         }
-        return logos;
-    });
+    );
 }
 
 async function getAlcorLogos(env: KVNamespace, chain: string): Promise<Record<string, any>> {
     const cacheId = `NEFTY_${chain.toUpperCase()}_LOGOS_ALCOR`;
-    return await fetchCached(cacheId, env, 3600, true, async () => {
-        const { data, error } = await useFetch<{ name: string; download_url: string }[]>(
-            `/repos/avral/alcor-ui/contents/assets/tokens/${chain.toLowerCase()}`,
-            {
-                baseUrl: config.GITHUB_API,
-                headers: {
-                    "Content-Type": "application/json",
-                    "User-Agent": "request",
-                },
+    return await fetchCached(
+        async () => {
+            const { data, error } = await useFetch<{ name: string; download_url: string }[]>(
+                `/repos/avral/alcor-ui/contents/assets/tokens/${chain.toLowerCase()}`,
+                {
+                    baseUrl: config.GITHUB_API,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "User-Agent": "request",
+                    },
+                }
+            );
+
+            if (error) throw error;
+            if (!data) throw new Error("No data found");
+
+            const logos: Record<string, any> = {};
+            for (let i = 0; i < data.length; i++) {
+                const { name, download_url } = data[i];
+
+                const nameWithoutLastExtension = name.split(".").slice(0, -1).join(".");
+                const [symbol, contract] = nameWithoutLastExtension.split("_");
+
+                if (symbol && contract) {
+                    logos[`${symbol.toUpperCase()}@${contract.toLowerCase()}`] = {
+                        logo: download_url,
+                        logo_lg: download_url,
+                    };
+                }
             }
-        );
-
-        if (error) throw error;
-        if (!data) throw new Error("No data found");
-
-        const logos: Record<string, any> = {};
-        for (let i = 0; i < data.length; i++) {
-            const { name, download_url } = data[i];
-
-            const nameWithoutLastExtension = name.split(".").slice(0, -1).join(".");
-            const [symbol, contract] = nameWithoutLastExtension.split("_");
-
-            if (symbol && contract) {
-                logos[`${symbol.toUpperCase()}@${contract.toLowerCase()}`] = {
-                    logo: download_url,
-                    logo_lg: download_url,
-                };
-            }
+            return logos;
+        },
+        {
+            key: cacheId,
+            env,
+            ttlSeconds: 3600,
+            fallbackToCache: true,
         }
-        return logos;
-    });
+    );
 }
 
 async function getLaunchbagzLogos(env: KVNamespace, chain: string, url?: string): Promise<Record<string, any>> {
     if (!url) return {};
 
     const cacheId = `NEFTY_${chain.toUpperCase()}_LOGOS_LAUNCHBAGZ`;
-    return await fetchCached(cacheId, env, 3600, true, async () => {
-        const { data, error } = await useFetch<{
-            data: { token_code: string; token_contract: string; image: string }[];
-        }>("/launchbagz/v1/tokens", {
-            baseUrl: url,
-            params: {
-                limit: Number(1000).toString(),
-            },
-            headers: {
-                "Content-Type": "application/json",
-                "User-Agent": "request",
-            },
-        });
+    return await fetchCached(
+        async () => {
+            const { data, error } = await useFetch<{
+                data: { token_code: string; token_contract: string; image: string }[];
+            }>("/launchbagz/v1/tokens", {
+                baseUrl: url,
+                params: {
+                    limit: Number(1000).toString(),
+                },
+                headers: {
+                    "Content-Type": "application/json",
+                    "User-Agent": "request",
+                },
+            });
 
-        if (error) throw error;
-        if (!data) throw new Error("No data found");
+            if (error) throw error;
+            if (!data) throw new Error("No data found");
 
-        const logos: Record<string, any> = {};
-        for (let i = 0; i < data.data.length; i++) {
-            const token = data.data[i];
+            const logos: Record<string, any> = {};
+            for (let i = 0; i < data.data.length; i++) {
+                const token = data.data[i];
 
-            if (token.image) {
-                logos[`${token.token_code.toUpperCase()}@${token.token_contract}`] = {
-                    logo: `${config.NEFTY_IPFS}/ipfs/${token.image}`,
-                    logo_lg: `${config.NEFTY_IPFS}/ipfs/${token.image}`,
-                };
+                if (token.image) {
+                    logos[`${token.token_code.toUpperCase()}@${token.token_contract}`] = {
+                        logo: `${config.NEFTY_IPFS}/ipfs/${token.image}`,
+                        logo_lg: `${config.NEFTY_IPFS}/ipfs/${token.image}`,
+                    };
+                }
             }
-        }
 
-        return logos;
-    });
+            return logos;
+        },
+        {
+            key: cacheId,
+            env,
+            ttlSeconds: 3600,
+            fallbackToCache: true,
+        }
+    );
 }
 
 export async function getAllLogos({

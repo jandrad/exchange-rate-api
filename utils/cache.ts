@@ -1,10 +1,13 @@
-export async function fetchCached<T extends any>(
-    key: string,
-    env: KVNamespace,
-    ttlSeconds: number,
-    fallbackToCache: boolean,
-    fn: () => Promise<T>
+export async function fetchCached<T>(
+    fn: () => Promise<T>,
+    options: {
+        key: string;
+        env: KVNamespace;
+        ttlSeconds: number;
+        fallbackToCache?: boolean;
+    }
 ): Promise<T> {
+    const { key, env, ttlSeconds, fallbackToCache = false } = options;
     const store = await env.get(key);
     const parsed = store ? JSON.parse(store) : null;
 

@@ -1,6 +1,6 @@
 import { config, getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
-import { isError, getURLParameters } from "../../../utils";
+import { isError, getURLParameters, reportWoeError, shouldFallbackToNeftyPools } from "../../../utils";
 import { fetchCached } from "../../../utils/cache";
 
 const neftySwapContract = "swap.nefty";
@@ -53,13 +53,17 @@ export async function getAllNeftyPairs({
         if (!result.data) throw new Error("No data found");
 
         pairs = pairs.concat(
-            result.data.rows.map((row: PairRow) => ({
-                reserve0: parseToken(row.reserve0),
-                reserve1: parseToken(row.reserve1),
-                total_liquidity: row.total_liquidity,
-                code: row.code,
-                active: row.active,
-            }))
+            result.data.rows
+                .filter(
+                    (row) => row.active && +parseToken(row.reserve0).amount > 0 && +parseToken(row.reserve1).amount > 0
+                )
+                .map((row: PairRow) => ({
+                    reserve0: parseToken(row.reserve0),
+                    reserve1: parseToken(row.reserve1),
+                    total_liquidity: row.total_liquidity,
+                    code: row.code,
+                    active: row.active,
+                }))
         );
         if (result.data.more) {
             lower_bound = result.data.next_key;
@@ -71,28 +75,36 @@ export async function getAllNeftyPairs({
 }
 
 export async function getNeftySwapFees({ chain, env }: { chain: string; env: KVNamespace }): Promise<number> {
-    return await fetchCached(`NEFTY_SWAP_FEES_${chain.toLocaleUpperCase()}`, env, 3600 * 24, false, async () => {
-        const { chainApiUrl } = getChainConfig(chain);
-        const result = await useFetch<{ rows: { key: string; value: string }[] }>("/v1/chain/get_table_rows", {
-            baseUrl: chainApiUrl,
-            method: "POST",
-            body: {
-                code: neftySwapContract,
-                scope: neftySwapContract,
-                table: "configs",
-                limit: 1000,
-                reverse: false,
-                json: true,
-                show_payer: false,
-            },
-        });
-        if (result.error) throw result.error;
-        if (!result.data) throw new Error("No data found");
+    return await fetchCached(
+        async () => {
+            const { chainApiUrl } = getChainConfig(chain);
+            const result = await useFetch<{ rows: { key: string; value: string }[] }>("/v1/chain/get_table_rows", {
+                baseUrl: chainApiUrl,
+                method: "POST",
+                body: {
+                    code: neftySwapContract,
+                    scope: neftySwapContract,
+                    table: "configs",
+                    limit: 1000,
+                    reverse: false,
+                    json: true,
+                    show_payer: false,
+                },
+            });
+            if (result.error) throw result.error;
+            if (!result.data) throw new Error("No data found");
 
-        const protocolFee = result.data.rows.find((row) => row.key === "fee.protocol")?.value ?? "0";
-        const tradeFee = result.data.rows.find((row) => row.key === "fee.trade")?.value ?? "0";
-        return +protocolFee + +tradeFee;
-    });
+            const protocolFee = result.data.rows.find((row) => row.key === "fee.protocol")?.value ?? "0";
+            const tradeFee = result.data.rows.find((row) => row.key === "fee.trade")?.value ?? "0";
+            return +protocolFee + +tradeFee;
+        },
+        {
+            key: `NEFTY_SWAP_FEES_${chain.toLocaleUpperCase()}`,
+            env,
+            ttlSeconds: 3600 * 24,
+            fallbackToCache: false,
+        }
+    );
 }
 
 async function getNeftyRoute({
@@ -105,18 +117,16 @@ async function getNeftyRoute({
     tokenOut: string;
 }): Promise<Pair[]> {
     const pairs = await getAllNeftyPairs({ chain });
-    const pairsMap: Record<string, Pair> = pairs
-        .filter((p) => p.active)
-        .reduce(
-            (acc, pair) => ({
-                ...acc,
-                [`${pair.reserve0.symbol.ticker}_${pair.reserve0.contract}-${pair.reserve1.symbol.ticker}_${pair.reserve1.contract}`]:
-                    pair,
-                [`${pair.reserve1.symbol.ticker}_${pair.reserve1.contract}-${pair.reserve0.symbol.ticker}_${pair.reserve0.contract}`]:
-                    pair,
-            }),
-            {}
-        );
+    const pairsMap: Record<string, Pair> = pairs.reduce(
+        (acc, pair) => ({
+            ...acc,
+            [`${pair.reserve0.symbol.ticker}_${pair.reserve0.contract}-${pair.reserve1.symbol.ticker}_${pair.reserve1.contract}`]:
+                pair,
+            [`${pair.reserve1.symbol.ticker}_${pair.reserve1.contract}-${pair.reserve0.symbol.ticker}_${pair.reserve0.contract}`]:
+                pair,
+        }),
+        {}
+    );
 
     const directRoute = pairsMap[`${tokenIn}-${tokenOut}`];
     if (directRoute) {
@@ -282,10 +292,16 @@ async function getGlobalLiquidity({
 
 async function getAllRoutes({ params, env }: { params: Record<string, any>; env: KVNamespace }): Promise<Route[]> {
     let routes: Route[] = [];
-    if (config.NEFTY_SWAP_FALLBACK) {
+    const fallback = await shouldFallbackToNeftyPools(env);
+    if (fallback || params.chain?.includes("test")) {
         routes = await getNeftyRoutes({ params, env });
     } else {
-        routes = await getWoeRoutes({ params });
+        try {
+            routes = await getWoeRoutes({ params });
+        } catch (error) {
+            await reportWoeError(env);
+            throw error;
+        }
     }
 
     return routes;
