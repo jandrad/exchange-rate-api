@@ -74,7 +74,7 @@ async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string 
         {
             key: cacheKey,
             env,
-            ttlSeconds: 1200,
+            ttlSeconds: 3600,
             fallbackToCache: false,
         }
     );
@@ -212,7 +212,7 @@ async function tokens({
         }
 
         return new Response(JSON.stringify(result), {
-            headers: { "Cache-Control": "s-maxage=1800", "content-type": "application/json" },
+            headers: { "Cache-Control": "s-maxage=60", "content-type": "application/json" },
         });
     } catch (error) {
         return isError(error);

@@ -170,13 +170,13 @@ async function tokens({
         if (token) {
             if (logos[token])
                 return new Response(JSON.stringify(logos[token]), {
-                    headers: { "Cache-Control": "s-maxage=1800", "content-type": "application/json" },
+                    headers: { "Cache-Control": "s-maxage=300", "content-type": "application/json" },
                 });
             else return new Response("No token found", { status: 404 });
         }
 
         return new Response(JSON.stringify(logos), {
-            headers: { "Cache-Control": "s-maxage=1800", "content-type": "application/json" },
+            headers: { "Cache-Control": "s-maxage=300", "content-type": "application/json" },
         });
     } catch (error) {
         if (error instanceof Error) {
