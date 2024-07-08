@@ -61,7 +61,7 @@ async function prices(env: KVNamespace): Promise<Response> {
         const prices = await getPrices(env);
         return new Response(JSON.stringify(prices), {
             headers: {
-                "Cache-Control": "s-maxage=1800",
+                "Cache-Control": "s-maxage=60",
                 "content-type": "application/json",
             },
         });
