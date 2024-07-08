@@ -26,7 +26,7 @@ export async function getPrices(env: KVNamespace): Promise<Record<string, number
                         show_payer: false,
                     }),
                 }).then((r) => r.json()),
-                fetch(`${config.WAXONEDGE_API}/tokens`, {
+                fetch(`${config.WAXONEDGE_API}/tokens?minimaldata=true`, {
                     method: "GET",
                     redirect: "follow",
                     headers: {
@@ -50,7 +50,7 @@ export async function getPrices(env: KVNamespace): Promise<Record<string, number
         {
             key: "WAX_TOKEN_PRICES",
             env,
-            ttlSeconds: 3600,
+            ttlSeconds: 30,
             fallbackToCache: true,
         }
     );
@@ -61,7 +61,7 @@ async function prices(env: KVNamespace): Promise<Response> {
         const prices = await getPrices(env);
         return new Response(JSON.stringify(prices), {
             headers: {
-                "Cache-Control": "s-maxage=60",
+                "Cache-Control": "s-maxage=5",
                 "content-type": "application/json",
             },
         });
