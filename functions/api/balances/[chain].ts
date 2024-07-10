@@ -52,7 +52,7 @@ async function balances({
     balances.sort((a, b) => +b.usdValue! - +a.usdValue!);
 
     return new Response(JSON.stringify(balances), {
-        headers: { "Cache-Control": "s-maxage=1", "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
     });
 }
 
