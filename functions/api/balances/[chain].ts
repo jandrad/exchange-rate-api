@@ -3,6 +3,37 @@ import { cors, useFetch } from "../../../lib";
 import { isError, getURLParameters } from "../../../utils";
 import { getPrices } from "../prices/wax";
 
+async function getAccountBalances({
+    balanceUrl,
+    fallbackUrl,
+    account,
+}: {
+    account: string;
+    balanceUrl: string;
+    fallbackUrl?: string;
+}): Promise<{ data: BalancesResponse | null; error: any }> {
+    const result = await Promise.race([
+        useFetch<BalancesResponse>(`/${account}`, {
+            baseUrl: balanceUrl,
+            headers: {
+                "Content-Type": "application/json",
+            },
+        }),
+        new Promise<{ data: BalancesResponse | null; error: any }>((resolve) =>
+            setTimeout(() => resolve({ data: null, error: new Error("Timeout exceeded") }), fallbackUrl ? 500 : 2000)
+        ),
+    ]);
+
+    if (result.error) {
+        if (fallbackUrl) {
+            return getAccountBalances({ account, balanceUrl: fallbackUrl, fallbackUrl: undefined });
+        }
+        return result;
+    }
+
+    return result;
+}
+
 async function balances({
     env,
     account,
@@ -14,17 +45,12 @@ async function balances({
 }): Promise<Response> {
     if (!account) return new Response("No account provided", { status: 400 });
 
-    const { mainChain, balanceUrl } = getChainConfig(chain);
+    const { mainChain, balanceUrl, balancesFallbackUrl } = getChainConfig(chain);
     if (mainChain !== "wax") return new Response("Invalid chain", { status: 400 });
 
     const [prices, { data, error }] = await Promise.all([
         getPrices(env),
-        useFetch<BalancesResponse>(`/${account}`, {
-            baseUrl: balanceUrl,
-            headers: {
-                "Content-Type": "application/json",
-            },
-        }),
+        getAccountBalances({ balanceUrl: balanceUrl!, account, fallbackUrl: balancesFallbackUrl }),
     ]);
 
     if (error) return isError(error);

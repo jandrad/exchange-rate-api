@@ -8,6 +8,7 @@ export const config = {
     GITHUB_FILES: "https://raw.githubusercontent.com",
     GITHUB_API: "https://api.github.com",
     BALANCES_API: "https://lightapi-mainnet.neftyblocks.com/api/balances/wax",
+    BALANCES_FALLBACK: "https://wax.light-api.net/api/balances/wax",
     BALANCES_API_TEST: "https://lightapi-testnet.neftyblocks.com/api/balances/waxtest",
 };
 
@@ -17,10 +18,12 @@ export const getChainConfig = (
     mainChain: string;
     launchbagzUrl?: string;
     balanceUrl?: string;
+    balancesFallbackUrl?: string;
     chainApiUrl?: string;
 } => {
     let launchbagzUrl = chain.includes("wax") ? config.NEFTY_API : undefined;
     let balanceUrl = chain.includes("wax") ? config.BALANCES_API : undefined;
+    let balancesFallbackUrl = chain.includes("wax") ? config.BALANCES_FALLBACK : undefined;
     let chainApiUrl = chain.includes("wax") ? config.CHAIN_API : undefined;
     let mainChain = chain;
 
@@ -29,6 +32,7 @@ export const getChainConfig = (
         if (launchbagzUrl) launchbagzUrl = config.NEFTY_API_TEST;
         if (balanceUrl) balanceUrl = config.BALANCES_API_TEST;
         if (chainApiUrl) chainApiUrl = config.CHAIN_API_TEST;
+        balancesFallbackUrl = undefined;
     } else if (chain.includes("main")) {
         mainChain = chain.replace("mainnet", "").replace("main", "");
     }
@@ -37,6 +41,7 @@ export const getChainConfig = (
         mainChain,
         launchbagzUrl,
         balanceUrl,
+        balancesFallbackUrl,
         chainApiUrl,
     };
 };
