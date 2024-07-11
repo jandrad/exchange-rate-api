@@ -30,9 +30,15 @@ paths:
                     description: "No tokens found"
                 500:
                     description: "Internal server error"
-    "/api/prices/wax":
+    "/api/prices/{chain}":
         get:
-            description: "Get the token and prices in wax"
+            description: "Get the token and prices in wax, proton or telos"
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  type: string
+                  example: wax
             responses:
                 200:
                     description: "Success."

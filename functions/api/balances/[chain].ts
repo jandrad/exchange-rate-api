@@ -1,7 +1,7 @@
 import { getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
 import { isError, getURLParameters } from "../../../utils";
-import { getPrices } from "../prices/wax";
+import { getPrices } from "../prices/[chain]";
 
 async function getAccountBalances({
     balanceUrl,
@@ -45,19 +45,20 @@ async function balances({
 }): Promise<Response> {
     if (!account) return new Response("No account provided", { status: 400 });
 
-    const { mainChain, balanceUrl, balancesFallbackUrl } = getChainConfig(chain);
-    if (mainChain !== "wax") return new Response("Invalid chain", { status: 400 });
+    const { balanceUrl, balancesFallbackUrl } = getChainConfig(chain);
+    if (!balanceUrl) {
+        return new Response("Unsupported chain", { status: 400 });
+    }
 
     const [prices, { data, error }] = await Promise.all([
-        getPrices(env),
-        getAccountBalances({ balanceUrl: balanceUrl!, account, fallbackUrl: balancesFallbackUrl }),
+        getPrices(env, chain),
+        getAccountBalances({ balanceUrl: balanceUrl, account, fallbackUrl: balancesFallbackUrl }),
     ]);
 
     if (error) return isError(error);
     if (!data) return new Response("No data found", { status: 404 });
 
     const balances: Balance[] = [];
-
     for (let i = 0; i < data.balances.length; i++) {
         const balance = data.balances[i];
         if (+balance.amount <= 0) continue;

@@ -1,4 +1,4 @@
-import { config } from "../../../config";
+import { config, getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
 import { isError, getURLParameters, shouldFallbackToNeftyPools } from "../../../utils";
 import { Pair, getAllNeftyPairs } from "../swap/routes";
@@ -47,12 +47,14 @@ function getTokenApisFromPairs(pairs: Pair[]): TokenApi[] {
 
 async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string }): Promise<Record<string, TokenList>> {
     const cacheKey = `NEFTY_API_TOKENS_${chain.toUpperCase()}`;
+    const { launchbagzUrl } = getChainConfig(chain);
+    if (!launchbagzUrl) return {};
     return await fetchCached(
         async () => {
             const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
                 getAllNeftyPairs({ chain }),
                 useFetch<TaxAPI>("/launchbagz/v1/tokens", {
-                    baseUrl: config.NEFTY_API,
+                    baseUrl: launchbagzUrl,
                     headers: {
                         "Content-Type": "application/json",
                     },
@@ -81,6 +83,7 @@ async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string 
 }
 
 async function getWaoTokens({ env }: { env: KVNamespace }): Promise<Record<string, TokenList>> {
+    const { launchbagzUrl } = getChainConfig("wax");
     return await fetchCached(
         async () => {
             const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
@@ -91,7 +94,7 @@ async function getWaoTokens({ env }: { env: KVNamespace }): Promise<Record<strin
                     },
                 }),
                 useFetch<TaxAPI>("/launchbagz/v1/tokens", {
-                    baseUrl: config.NEFTY_API,
+                    baseUrl: launchbagzUrl,
                     headers: {
                         "Content-Type": "application/json",
                     },
