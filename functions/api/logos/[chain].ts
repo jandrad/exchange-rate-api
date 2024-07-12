@@ -176,7 +176,7 @@ async function tokens({
         }
 
         return new Response(JSON.stringify(logos), {
-            headers: { "Cache-Control": "s-maxage=300", "content-type": "application/json" },
+            headers: { "Cache-Control": "s-maxage=60", "content-type": "application/json" },
         });
     } catch (error) {
         if (error instanceof Error) {
