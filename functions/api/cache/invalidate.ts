@@ -2,7 +2,7 @@ interface Env {
     ERA: KVNamespace;
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
     const { logos, tokens, prices } = await request.json<{ logos: boolean; tokens: boolean; prices: boolean }>();
     const list = await env.ERA.list();
     const keysToInvalidate = list.keys

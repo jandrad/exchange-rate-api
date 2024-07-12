@@ -118,7 +118,7 @@ interface AlcorToken {
     usd_price: number;
 }
 
-export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
+export const onRequest: PagesFunction<Env> = async ({ request, env, params }) => {
     const chain = params.chain as string;
     const res = await prices(env.ERA, chain);
     return cors(request, res);

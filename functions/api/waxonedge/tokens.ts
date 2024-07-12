@@ -226,7 +226,7 @@ interface Env {
     ERA: KVNamespace;
 }
 
-export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
     const { search, page, preset, limit, chain } = getURLParameters(request.url);
 
     const res = await tokens({

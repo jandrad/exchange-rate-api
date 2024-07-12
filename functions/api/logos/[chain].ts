@@ -190,7 +190,7 @@ interface Env {
     ERA: KVNamespace;
 }
 
-export const onRequestGet: PagesFunction<Env> = async ({ request, params, env }) => {
+export const onRequest: PagesFunction<Env> = async ({ request, params, env }) => {
     const { token } = getURLParameters(request.url);
     const chain = params.chain as string;
 

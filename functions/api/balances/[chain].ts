@@ -87,7 +87,7 @@ interface Env {
     ERA: KVNamespace;
 }
 
-export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
+export const onRequest: PagesFunction<Env> = async ({ request, env, params }) => {
     const { account } = getURLParameters(request.url);
     const chain = params.chain as string;
     const res = await balances({
