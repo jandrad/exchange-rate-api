@@ -20,7 +20,7 @@ async function getAccountBalances({
             },
         }),
         new Promise<{ data: BalancesResponse | null; error: any }>((resolve) =>
-            setTimeout(() => resolve({ data: null, error: new Error("Timeout exceeded") }), fallbackUrl ? 500 : 2000)
+            setTimeout(() => resolve({ data: null, error: new Error("Timeout exceeded") }), fallbackUrl ? 1500 : 4000)
         ),
     ]);
 
