@@ -131,6 +131,55 @@ paths:
                         type: object
                 500:
                     description: "Internal server error"
+    "/api/holders/{chain}/{token}":
+        get:
+            description: "Get the top token holders"
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  type: string
+                  example: wax
+                - name: token
+                  description: "Token symbol in the format [contract]_[symbol]"
+                  in: path
+                  required: true
+                  type: string
+                  example: wax
+                - name: limit
+                  in: query
+                  required: true
+                  type: integer
+                  example: 50
+            responses:
+                200:
+                    description: "Success."
+                    schema:
+                        type: object
+                500:
+                    description: "Internal server error"
+    "/api/holders/{chain}/{token}/count":
+        get:
+            description: "Get the total holders of a token"
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  type: string
+                  example: wax
+                - name: token
+                  description: "Token symbol in the format [contract]_[symbol]"
+                  in: path
+                  required: true
+                  type: string
+                  example: wax
+            responses:
+                200:
+                    description: "Success."
+                    schema:
+                        type: object
+                500:
+                    description: "Internal server error"
     "/api/swap/routes":
         get:
             description: "Get routes to swap"

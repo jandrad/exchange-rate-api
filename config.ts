@@ -7,8 +7,7 @@ type Config = {
         [chain: string]: {
             NEFTY_API?: string;
             CHAIN_API?: string;
-            BALANCES_API?: string;
-            BALANCES_FALLBACK?: string;
+            LIGHT_API: string[];
         };
     };
 };
@@ -22,26 +21,24 @@ export const config: Config = {
         wax: {
             NEFTY_API: "https://aa.neftyblocks.com",
             CHAIN_API: "https://wax.neftyblocks.com",
-            BALANCES_API: "https://lightapi-mainnet.neftyblocks.com/api/balances/wax",
-            BALANCES_FALLBACK: "https://wax.light-api.net/api/balances/wax",
+            LIGHT_API: ["https://lightapi-mainnet.neftyblocks.com", "https://wax.light-api.net"],
         },
         waxtest: {
             NEFTY_API: "https://aa-testnet.neftyblocks.com",
             CHAIN_API: "https://wax-testnet.neftyblocks.com",
-            BALANCES_API: "https://lightapi-testnet.neftyblocks.com/api/balances/waxtest",
-            BALANCES_FALLBACK: "https://testnet-lightapi.eosams.xeos.me/api/balances/waxtest",
+            LIGHT_API: ["https://lightapi-testnet.neftyblocks.com", "https://testnet-lightapi.eosams.xeos.me"],
         },
         proton: {
-            BALANCES_API: "https://proton.light-api.net/api/balances/proton",
+            LIGHT_API: ["https://proton.light-api.net"],
         },
         protontest: {
-            BALANCES_API: "https://testnet-lightapi.eosams.xeos.me/api/balances/protontest",
+            LIGHT_API: ["https://testnet-lightapi.eosams.xeos.me"],
         },
         telos: {
-            BALANCES_API: "https://lightapi-mainnet.neftyblocks.com/api/balances/wax",
+            LIGHT_API: ["https://telos.light-api.net"],
         },
         telostest: {
-            BALANCES_API: "https://telos.light-api.net/api/balances/telos",
+            LIGHT_API: ["https://testnet-lightapi.eosams.xeos.me"],
         },
     },
 };
@@ -53,6 +50,10 @@ export const getChainConfig = (
     launchbagzUrl?: string;
     balanceUrl?: string;
     balancesFallbackUrl?: string;
+    holdersUrl?: string;
+    holdersFallbackUrl?: string;
+    holdersCountUrl?: string;
+    holdersCountFallbackUrl?: string;
     chainApiUrl?: string;
 } => {
     let mainChain = chain;
@@ -70,16 +71,33 @@ export const getChainConfig = (
         configChain = mainChain;
     }
 
+    const lightApiUrl = config.CHAINS[configChain]?.LIGHT_API[0];
+    const lightApiFallbackUrl = config.CHAINS[configChain]?.LIGHT_API[1];
+
+    const getApiUrl = (chain: string, path: string, fallback: boolean) => {
+        if (fallback && lightApiFallbackUrl) {
+            return `${lightApiFallbackUrl}/${path}/${chain}`;
+        }
+
+        if (lightApiUrl) {
+            return `${lightApiUrl}/${path}/${chain}`;
+        }
+
+        return undefined;
+    };
+
     const launchbagzUrl = config.CHAINS[configChain]?.NEFTY_API;
-    const balanceUrl = config.CHAINS[configChain]?.BALANCES_API;
     const chainApiUrl = config.CHAINS[configChain]?.CHAIN_API;
-    const balancesFallbackUrl = config.CHAINS[configChain]?.BALANCES_FALLBACK;
 
     return {
         mainChain,
         launchbagzUrl,
-        balanceUrl,
-        balancesFallbackUrl,
+        balanceUrl: getApiUrl(configChain, "api/balances", false),
+        balancesFallbackUrl: getApiUrl(configChain, "api/balances", true),
+        holdersUrl: getApiUrl(configChain, "api/topholders", false),
+        holdersFallbackUrl: getApiUrl(configChain, "api/topholders", true),
+        holdersCountUrl: getApiUrl(configChain, "api/holdercount", false),
+        holdersCountFallbackUrl: getApiUrl(configChain, "api/holdercount", true),
         chainApiUrl,
     };
 };
