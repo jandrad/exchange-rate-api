@@ -12,12 +12,15 @@ async function rate(symbol?: string | null): Promise<Response> {
                 method: "GET",
                 redirect: "follow",
                 headers: {
-                    "Content-Type": "text/plain",
+                    "Content-Type": "application/json",
                 },
             });
             rate = ((await result.json()) as any).USD;
         } catch (error) {
-            console.error(error);
+            console.log(error);
+        }
+
+        if (!rate) {
             const result = await fetch(`https://cryptoprices.cc/${symbol}`, {
                 method: "GET",
                 redirect: "follow",
