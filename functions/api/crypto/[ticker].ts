@@ -15,8 +15,10 @@ async function rate(symbol?: string | null): Promise<Response> {
                     "Content-Type": "application/json",
                 },
             });
-            console.log("Result: ", result);
-            rate = ((await result.json()) as any).USD;
+            console.log(result.text());
+            if (result.status === 200) {
+                rate = ((await result.json()) as any).USD;
+            }
         } catch (error) {
             console.log(error);
         }
@@ -29,6 +31,9 @@ async function rate(symbol?: string | null): Promise<Response> {
                     "Content-Type": "text/plain",
                 },
             });
+            if (result.status !== 200) {
+                return new Response("No rate found", { status: 404 });
+            }
             rate = await result.text();
         }
 
