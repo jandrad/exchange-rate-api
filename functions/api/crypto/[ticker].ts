@@ -17,6 +17,7 @@ async function rate(symbol?: string | null): Promise<Response> {
             });
             rate = ((await result.json()) as any).USD;
         } catch (error) {
+            console.error(error);
             const result = await fetch(`https://cryptoprices.cc/${symbol}`, {
                 method: "GET",
                 redirect: "follow",
@@ -26,6 +27,8 @@ async function rate(symbol?: string | null): Promise<Response> {
             });
             rate = await result.text();
         }
+
+        console.log("Rate for " + symbol + ": " + rate);
 
         if (!rate) {
             return new Response("No rate found", { status: 404 });
