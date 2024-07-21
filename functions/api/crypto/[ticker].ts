@@ -15,6 +15,7 @@ async function rate(symbol?: string | null): Promise<Response> {
                     "Content-Type": "application/json",
                 },
             });
+            console.log("Result: ", result);
             rate = ((await result.json()) as any).USD;
         } catch (error) {
             console.log(error);
