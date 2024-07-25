@@ -1,9 +1,9 @@
 import { config, getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
 import { isError, getURLParameters, shouldFallbackToNeftyPools } from "../../../utils";
-import { Pair, getAllNeftyPairs } from "../swap/routes";
 import { getAllLogos } from "../logos/[chain]";
 import { fetchCached } from "../../../utils/cache";
+import { getAllNeftyPairs, Pair } from "../../../services/pairs";
 
 const pageSize = 50;
 

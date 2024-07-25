@@ -1,5 +1,6 @@
 import { config, getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
+import { getAllNeftyPairs, Pair } from "../../../services/pairs";
 import { getURLParameters } from "../../../utils";
 import { fetchCached } from "../../../utils/cache";
 
@@ -130,6 +131,23 @@ async function getLaunchbagzLogos(env: KVNamespace, chain: string, url?: string)
     );
 }
 
+async function getNeftyPairs(env: KVNamespace, chain: string): Promise<Pair[]> {
+    const cacheId = `NEFTY_${chain.toUpperCase()}_NEFTY_PAIRS`;
+    return await fetchCached(
+        async () => {
+            return await getAllNeftyPairs({
+                chain,
+            });
+        },
+        {
+            key: cacheId,
+            env,
+            ttlSeconds: 3600,
+            fallbackToCache: true,
+        }
+    );
+}
+
 export async function getAllLogos({
     env,
     chain,
@@ -138,19 +156,36 @@ export async function getAllLogos({
     chain: string;
 }): Promise<Record<string, { logo: string; logo_lg: string }>> {
     const { launchbagzUrl, mainChain } = getChainConfig(chain);
-    const logos = (
-        await Promise.all([
-            getAlcorLogos(env, mainChain),
-            getEosCafeLogos(env, mainChain),
-            getLaunchbagzLogos(env, chain, launchbagzUrl),
-        ])
-    ).reduce(
+
+    const [alcorLogos, eosCafeLogos, launchbagzLogos, neftyPairs] = await Promise.all([
+        getAlcorLogos(env, mainChain),
+        getEosCafeLogos(env, mainChain),
+        getLaunchbagzLogos(env, chain, launchbagzUrl),
+        getNeftyPairs(env, chain),
+    ]);
+
+    const logos = [alcorLogos, eosCafeLogos, launchbagzLogos].reduce(
         (acc, curr) => ({
             ...acc,
             ...curr,
         }),
         {}
     );
+
+    for (const pair of neftyPairs) {
+        const pairKey = `${pair.code}@${pair.contract}`;
+        const token1Key = `${pair.reserve0.symbol.ticker}@${pair.reserve0.contract}`;
+        const token2Key = `${pair.reserve1.symbol.ticker}@${pair.reserve1.contract}`;
+        const logo1 = logos[token1Key];
+        const logo2 = logos[token2Key];
+        if (logo1 && logo2) {
+            logos[pairKey] = {
+                logo: `https://resizer.neftyblocks.com/composer?left=${logo1.logo_lg}&right=${logo2.logo_lg}&width=300`,
+                logo_lg: `https://resizer.neftyblocks.com/composer?left=${logo1.logo_lg}&right=${logo2.logo_lg}&width=300`,
+            };
+        }
+    }
+
     return logos;
 }
 
