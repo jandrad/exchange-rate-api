@@ -37,7 +37,7 @@ async function getNeftyPairs(env: KVNamespace, chain: string): Promise<Pair[]> {
         {
             key: cacheId,
             env,
-            ttlSeconds: 3600,
+            ttlSeconds: 30,
             fallbackToCache: true,
         }
     );
@@ -54,7 +54,7 @@ async function getTacoPairs(env: KVNamespace, chain: string): Promise<Pair[]> {
         {
             key: cacheId,
             env,
-            ttlSeconds: 3600,
+            ttlSeconds: 30,
             fallbackToCache: true,
         }
     );
