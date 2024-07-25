@@ -2,6 +2,7 @@ import { getChainConfig } from "../config";
 import { useFetch } from "../lib";
 import { fetchCached } from "../utils";
 
+export const tacoSwapContract = "swap.taco";
 export const neftySwapContract = "swap.nefty";
 export const neftyLpContract = "lp.nefty";
 
@@ -40,8 +41,8 @@ type Symbol = {
     precision: number;
 };
 
-type PairRowsResponse = {
-    rows: PairRow[];
+type RowsResponse<T> = {
+    rows: T[];
     more: boolean;
     next_key: any;
 };
@@ -60,6 +61,18 @@ type PairRow = {
     total_liquidity: string;
 };
 
+type TacoPairRow = {
+    id: string;
+    pool1: {
+        quantity: string;
+        contract: string;
+    };
+    pool2: {
+        quantity: string;
+        contract: string;
+    };
+};
+
 export async function getAllNeftyPairs({
     chain,
     options = {},
@@ -71,24 +84,23 @@ export async function getAllNeftyPairs({
     let lower_bound = undefined;
     let pairs: Pair[] = [];
     do {
-        const result: { data: PairRowsResponse | null; error: Error | null } = await useFetch<PairRowsResponse>(
-            "/v1/chain/get_table_rows",
-            {
-                baseUrl: chainApiUrl,
-                method: "POST",
-                body: {
-                    code: neftySwapContract,
-                    scope: neftySwapContract,
-                    table: "pairs",
-                    lower_bound,
-                    limit: 1000,
-                    reverse: false,
-                    json: true,
-                    show_payer: false,
-                    ...options,
-                },
-            }
-        );
+        const result: { data: RowsResponse<PairRow> | null; error: Error | null } = await useFetch<
+            RowsResponse<PairRow>
+        >("/v1/chain/get_table_rows", {
+            baseUrl: chainApiUrl,
+            method: "POST",
+            body: {
+                code: neftySwapContract,
+                scope: neftySwapContract,
+                table: "pairs",
+                lower_bound,
+                limit: 1000,
+                reverse: false,
+                json: true,
+                show_payer: false,
+                ...options,
+            },
+        });
 
         if (result.error) throw result.error;
         if (!result.data) throw new Error("No data found");
@@ -105,6 +117,59 @@ export async function getAllNeftyPairs({
                     total_liquidity: row.total_liquidity,
                     code: row.code,
                     active: row.active,
+                }))
+        );
+        if (result.data.more) {
+            lower_bound = result.data.next_key;
+        } else {
+            lower_bound = undefined;
+        }
+    } while (lower_bound);
+    return pairs;
+}
+
+export async function getAllTacoPairs({
+    chain,
+    options = {},
+}: {
+    chain: string;
+    options?: Record<string, any>;
+}): Promise<Pair[]> {
+    const { chainApiUrl } = getChainConfig(chain);
+    let lower_bound = undefined;
+    let pairs: Pair[] = [];
+    do {
+        const result: { data: RowsResponse<TacoPairRow> | null; error: Error | null } = await useFetch<
+            RowsResponse<TacoPairRow>
+        >("/v1/chain/get_table_rows", {
+            baseUrl: chainApiUrl,
+            method: "POST",
+            body: {
+                code: tacoSwapContract,
+                scope: tacoSwapContract,
+                table: "pairs",
+                lower_bound,
+                limit: 1000,
+                reverse: false,
+                json: true,
+                show_payer: false,
+                ...options,
+            },
+        });
+
+        if (result.error) throw result.error;
+        if (!result.data) throw new Error("No data found");
+
+        pairs = pairs.concat(
+            result.data.rows
+                .filter((row) => +parseToken(row.pool1).amount > 0 && +parseToken(row.pool2).amount > 0)
+                .map((row: TacoPairRow) => ({
+                    contract: tacoSwapContract,
+                    reserve0: parseToken(row.pool1),
+                    reserve1: parseToken(row.pool2),
+                    total_liquidity: "",
+                    code: row.id,
+                    active: true,
                 }))
         );
         if (result.data.more) {
