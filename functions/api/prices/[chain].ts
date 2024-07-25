@@ -1,6 +1,7 @@
 import { cors } from "../../../lib";
 import { config, getChainConfig } from "../../../config";
 import { fetchCached } from "../../../utils/cache";
+import { getAllNeftyPairs, getAllTacoPairs, Pair } from "../../../services/pairs";
 
 export async function getAlcorPrices(env: KVNamespace, mainChain: string): Promise<Record<string, number>> {
     return await fetchCached(
@@ -25,12 +26,46 @@ export async function getAlcorPrices(env: KVNamespace, mainChain: string): Promi
     );
 }
 
+async function getNeftyPairs(env: KVNamespace, chain: string): Promise<Pair[]> {
+    const cacheId = `NEFTY_${chain.toUpperCase()}_NEFTY_PAIRS_TOKEN_PRICES`;
+    return await fetchCached(
+        async () => {
+            return await getAllNeftyPairs({
+                chain,
+            });
+        },
+        {
+            key: cacheId,
+            env,
+            ttlSeconds: 3600,
+            fallbackToCache: true,
+        }
+    );
+}
+
+async function getTacoPairs(env: KVNamespace, chain: string): Promise<Pair[]> {
+    const cacheId = `NEFTY_${chain.toUpperCase()}_TACO_PAIRS_TOKEN_PRICES`;
+    return await fetchCached(
+        async () => {
+            return await getAllTacoPairs({
+                chain,
+            });
+        },
+        {
+            key: cacheId,
+            env,
+            ttlSeconds: 3600,
+            fallbackToCache: true,
+        }
+    );
+}
+
 export async function getWaxPrices(env: KVNamespace): Promise<Record<string, number>> {
     const { chainApiUrl } = getChainConfig("wax");
     return await fetchCached(
         async () => {
             let prices: Record<string, number> = {};
-            const [{ rows: waxRows }, woePrices] = await Promise.all([
+            const [{ rows: waxRows }, woePrices, neftyPairs, tacoPairs] = await Promise.all([
                 fetch(`${chainApiUrl}/v1/chain/get_table_rows`, {
                     method: "POST",
                     redirect: "follow",
@@ -58,6 +93,8 @@ export async function getWaxPrices(env: KVNamespace): Promise<Record<string, num
                         "User-Agent": "request",
                     },
                 }).then((r) => r.json()),
+                getNeftyPairs(env, "wax"),
+                getTacoPairs(env, "wax"),
             ]);
 
             const waxPrice = Math.round((waxRows[0].median / 10000) * Math.pow(10, 8)) / Math.pow(10, 8);
@@ -66,6 +103,19 @@ export async function getWaxPrices(env: KVNamespace): Promise<Record<string, num
                 const key = `${price.symbol.ticker}@${price.contract}`;
                 if (price.wax_price) {
                     prices[key] = price.wax_price * waxPrice;
+                }
+            }
+
+            for (const pair of [...neftyPairs, ...tacoPairs]) {
+                const pairKey = `${pair.code}@${pair.contract}`;
+                const token1Key = `${pair.reserve0.symbol.ticker}@${pair.reserve0.contract}`;
+                const token2Key = `${pair.reserve1.symbol.ticker}@${pair.reserve1.contract}`;
+                const price1 = prices[token1Key];
+                const price2 = prices[token2Key];
+                if (price1 && price2) {
+                    const token1Amount = pair.reserve0.amount / pair.total_liquidity;
+                    const token2Amount = pair.reserve1.amount / pair.total_liquidity;
+                    prices[pairKey] = token1Amount * price1 + token2Amount * price2;
                 }
             }
 

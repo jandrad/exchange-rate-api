@@ -12,7 +12,7 @@ export type Pair = {
     active: boolean;
     reserve0: Token;
     reserve1: Token;
-    total_liquidity: string;
+    total_liquidity: number;
 };
 
 export type Token = {
@@ -71,6 +71,7 @@ type TacoPairRow = {
         quantity: string;
         contract: string;
     };
+    supply: string;
 };
 
 export async function getAllNeftyPairs({
@@ -114,7 +115,7 @@ export async function getAllNeftyPairs({
                     contract: neftyLpContract,
                     reserve0: parseToken(row.reserve0),
                     reserve1: parseToken(row.reserve1),
-                    total_liquidity: row.total_liquidity,
+                    total_liquidity: +row.total_liquidity,
                     code: row.code,
                     active: row.active,
                 }))
@@ -167,7 +168,7 @@ export async function getAllTacoPairs({
                     contract: tacoSwapContract,
                     reserve0: parseToken(row.pool1),
                     reserve1: parseToken(row.pool2),
-                    total_liquidity: "",
+                    total_liquidity: +row.supply.split(" ")[0],
                     code: row.id,
                     active: true,
                 }))
