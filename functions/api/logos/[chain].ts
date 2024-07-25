@@ -198,8 +198,12 @@ export async function getAllLogos({
         const logo2 = logos[token2Key];
         if (logo1 && logo2) {
             logos[pairKey] = {
-                logo: `https://resizer.neftyblocks.com/composer?left=${logo1.logo_lg}&right=${logo2.logo_lg}&width=100`,
-                logo_lg: `https://resizer.neftyblocks.com/composer?left=${logo1.logo_lg}&right=${logo2.logo_lg}&width=300`,
+                logo: `https://resizer.neftyblocks.com/composer?left=${encodeURIComponent(
+                    logo1.logo_lg
+                )}&right=${encodeURIComponent(logo2.logo_lg)}&width=100`,
+                logo_lg: `https://resizer.neftyblocks.com/composer?left=${encodeURIComponent(
+                    logo1.logo_lg
+                )}&right=${encodeURIComponent(logo2.logo_lg)}&width=300`,
             };
         }
     }
