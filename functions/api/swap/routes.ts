@@ -223,8 +223,6 @@ async function routes({ params, env }: { params: Record<string, any>; env: KVNam
         if (routes.error) {
             return new Response(routes.error, { status: 500 });
         }
-
-        console.log({ routes, globalLiquidity, global_price });
         const filteredData = (routes as Route[]).slice(0, 1).map((route) => ({
             hash: route.hash,
             route_price: route.route_price,
