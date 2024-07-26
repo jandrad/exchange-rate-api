@@ -186,7 +186,13 @@ async function getGlobalLiquidity({
     return { token_in_amount, token_out_amount };
 }
 
-async function getAllRoutes({ params, env }: { params: Record<string, any>; env: KVNamespace }): Promise<Route[]> {
+async function getAllRoutes({
+    params,
+    env,
+}: {
+    params: Record<string, any>;
+    env: KVNamespace;
+}): Promise<Route[] | { error: string }> {
     let routes: Route[] = [];
     const fallback = await shouldFallbackToNeftyPools(env);
     if (fallback || params.chain?.includes("test")) {
@@ -214,7 +220,12 @@ async function routes({ params, env }: { params: Record<string, any>; env: KVNam
         const { token_in_amount, token_out_amount } = globalLiquidity;
         const global_price = token_in_amount / token_out_amount;
 
-        const filteredData = routes.slice(0, 1).map((route) => ({
+        if (routes.error) {
+            return new Response(routes.error, { status: 500 });
+        }
+
+        console.log({ routes, globalLiquidity, global_price });
+        const filteredData = (routes as Route[]).slice(0, 1).map((route) => ({
             hash: route.hash,
             route_price: route.route_price,
             fees: route.fees,
