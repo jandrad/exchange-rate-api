@@ -1,9 +1,10 @@
 import { config, getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
 import { isError, getURLParameters, shouldFallbackToNeftyPools } from "../../../utils";
-import { getAllLogos } from "../logos/[chain]";
 import { fetchCached } from "../../../utils/cache";
 import { getAllNeftyPairs, Pair } from "../../../services/pairs";
+import { getAllLogos } from "../../../services/logos";
+import { getAllTaxes } from "../../../services/taxes";
 
 const pageSize = 50;
 
@@ -51,14 +52,9 @@ async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string 
     if (!launchbagzUrl) return {};
     return await fetchCached(
         async () => {
-            const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
+            const [tokensPromise, taxesPromise, logosPromise] = await Promise.allSettled([
                 getAllNeftyPairs({ chain }),
-                useFetch<TaxAPI>("/launchbagz/v1/tokens", {
-                    baseUrl: launchbagzUrl,
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                }),
+                getAllTaxes({ chain }),
                 getAllLogos({ env, chain }),
             ]);
 
@@ -67,11 +63,9 @@ async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string 
             }
 
             const data = getTokenApisFromPairs(tokensPromise.value);
-            const taxData = taxPromise.status === "fulfilled" ? taxPromise.value.data?.data : [];
             const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
-
-            const taxs = transformTaxs(taxData);
-            return filterTokens(data, taxs, logos);
+            const taxes = taxesPromise.status === "fulfilled" ? taxesPromise.value : {};
+            return filterTokens(data, taxes, logos);
         },
         {
             key: cacheKey,
@@ -82,23 +76,24 @@ async function getNeftyTokens({ env, chain }: { env: KVNamespace; chain: string 
     );
 }
 
-async function getWaoTokens({ env }: { env: KVNamespace }): Promise<Record<string, TokenList>> {
+async function getWaoTokens({
+    env,
+    exchange,
+}: {
+    env: KVNamespace;
+    exchange?: string;
+}): Promise<Record<string, TokenList>> {
     const { launchbagzUrl } = getChainConfig("wax");
     return await fetchCached(
         async () => {
-            const [tokensPromise, taxPromise, logosPromise] = await Promise.allSettled([
+            const [tokensPromise, taxesPromise, logosPromise] = await Promise.allSettled([
                 useFetch<TokenApi[]>("/tokens", {
                     baseUrl: config.WAXONEDGE_API,
                     headers: {
                         "Content-Type": "application/json",
                     },
                 }),
-                useFetch<TaxAPI>("/launchbagz/v1/tokens", {
-                    baseUrl: launchbagzUrl,
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                }),
+                getAllTaxes({ chain: "wax" }),
                 getAllLogos({ env, chain: "wax" }),
             ]);
 
@@ -109,11 +104,9 @@ async function getWaoTokens({ env }: { env: KVNamespace }): Promise<Record<strin
             if (error) throw error;
             if (!data) throw new Error("No data found");
 
-            const taxData = taxPromise.status === "fulfilled" ? taxPromise.value.data?.data : [];
             const logos = logosPromise.status === "fulfilled" ? logosPromise.value : {};
-
-            const taxs = transformTaxs(taxData);
-            return filterTokens(data, taxs, logos);
+            const taxes = taxesPromise.status === "fulfilled" ? taxesPromise.value : {};
+            return filterTokens(data, taxes, logos, exchange);
         },
         {
             key: "WAXONEDGE_API_TOKENS",
@@ -129,6 +122,7 @@ async function tokens({
     search,
     page,
     preset,
+    exchange,
     limit,
     chain,
 }: {
@@ -136,6 +130,7 @@ async function tokens({
     search?: string;
     page: number;
     preset?: string;
+    exchange?: string;
     limit: number;
     chain: string;
 }): Promise<Response> {
@@ -145,9 +140,13 @@ async function tokens({
         let tokens: Record<string, TokenList>;
         const fallback = await shouldFallbackToNeftyPools(env);
         if (fallback || chain.includes("test")) {
-            tokens = await getNeftyTokens({ env, chain });
+            if (exchange && exchange !== "neftyblocks") {
+                tokens = {};
+            } else {
+                tokens = await getNeftyTokens({ env, chain });
+            }
         } else {
-            tokens = await getWaoTokens({ env });
+            tokens = await getWaoTokens({ env, exchange });
         }
 
         if (search) {
@@ -243,15 +242,17 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
 
 const filterTokens = (
     tokens: TokenApi[],
-    taxs: Record<string, number>,
-    logos: Record<string, { logo_lg: string }> = {}
+    taxes: Record<string, number>,
+    logos: Record<string, { logo_lg: string }> = {},
+    exchange?: string
 ): Record<string, TokenList> => {
     const results: Record<string, TokenList> = {};
 
     for (let i = 0; i < tokens.length; i++) {
         const { symbol, contract, in_pool } = tokens[i];
 
-        const maxPool = in_pool.length > 0 ? in_pool.reduce((a, b) => (a.quote_amount > b.quote_amount ? a : b)) : null;
+        const pools = exchange ? in_pool.filter((x) => x.src === exchange) : in_pool;
+        const maxPool = pools.length > 0 ? pools.reduce((a, b) => (a.quote_amount > b.quote_amount ? a : b)) : null;
 
         if (maxPool) {
             const { vstoken } = maxPool;
@@ -262,14 +263,14 @@ const filterTokens = (
                 in: {
                     ticker: symbol.ticker,
                     contract: contract,
-                    tax: taxs[`${contract}_${symbol.ticker}`] || 0,
+                    tax: taxes[`${symbol.ticker}@${contract}`] || 0,
                     precision: symbol.precision,
                     logo: logos[`${symbol.ticker}@${contract}`]?.logo_lg,
                 },
                 out: {
                     ticker: vstoken.symbol.ticker,
                     contract: vstoken.contract,
-                    tax: taxs[`${vstoken.symbol.ticker}_${vstoken.contract}`] || 0,
+                    tax: taxes[`${vstoken.symbol.ticker}@${vstoken.contract}`] || 0,
                     precision: vstoken.symbol.precision,
                     logo: logos[`${vstoken.symbol.ticker}@${vstoken.contract}`]?.logo_lg,
                 },
@@ -277,17 +278,6 @@ const filterTokens = (
 
             results[`${contract}_${symbol.ticker}`] = tokens;
         }
-    }
-
-    return results;
-};
-
-const transformTaxs = (taxs: Tax[] = []): Record<string, number> => {
-    const results: Record<string, number> = {};
-
-    for (let i = 0; i < taxs.length; i++) {
-        const { token_code, token_contract, tx_fee } = taxs[i];
-        results[`${token_contract}_${token_code}`] = tx_fee;
     }
 
     return results;
@@ -316,25 +306,6 @@ type TokenApi = {
             amount: number;
         };
     }[];
-};
-
-type TaxAPI = {
-    success: boolean;
-    message?: string;
-    data?: Tax[];
-    query_time: number;
-};
-
-type Tax = {
-    contract: string;
-    token_contract: string;
-    token_code: string;
-    image: string;
-    tx_fee: number;
-    created_at_time: string;
-    updated_at_time: string;
-    created_at_block: string;
-    updated_at_block: string;
 };
 
 type TokenList = {

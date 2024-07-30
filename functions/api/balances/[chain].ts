@@ -1,5 +1,7 @@
 import { getChainConfig } from "../../../config";
 import { cors, useFetch } from "../../../lib";
+import { getAllLogos } from "../../../services/logos";
+import { getAllTaxes } from "../../../services/taxes";
 import { isError, getURLParameters } from "../../../utils";
 import { getPrices } from "../prices/[chain]";
 
@@ -50,9 +52,11 @@ async function balances({
         return new Response("Unsupported chain", { status: 400 });
     }
 
-    const [prices, { data, error }] = await Promise.all([
+    const [prices, { data, error }, taxes, logos] = await Promise.all([
         getPrices(env, chain),
         getAccountBalances({ balanceUrl: balanceUrl, account, fallbackUrl: balancesFallbackUrl }),
+        getAllTaxes({ chain }),
+        getAllLogos({ env, chain }),
     ]);
 
     if (error) return isError(error);
@@ -62,7 +66,9 @@ async function balances({
     for (let i = 0; i < data.balances.length; i++) {
         const balance = data.balances[i];
         if (+balance.amount <= 0) continue;
-        const price = prices[`${balance.currency}@${balance.contract}`];
+
+        const tokenKey = `${balance.currency}@${balance.contract}`;
+        const price = prices[tokenKey];
         let usdValue = "0.00";
         if (price) {
             usdValue = (+balance.amount * price).toFixed(2);
@@ -73,6 +79,8 @@ async function balances({
             decimals: balance.decimals,
             currency: balance.currency,
             usdValue,
+            tax: taxes[tokenKey] || 0,
+            logo: logos[tokenKey]?.logo_lg,
         });
     }
 
@@ -109,4 +117,6 @@ type Balance = {
     decimals: number;
     currency: string;
     usdValue: string;
+    tax: number;
+    logo?: string;
 };
