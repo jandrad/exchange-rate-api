@@ -189,22 +189,29 @@ export async function getAllLogos({
         {}
     );
 
-    for (const pair of [...neftyPairs, ...tacoPairs]) {
-        const pairKey = `${pair.code}@${pair.contract}`;
-        const token1Key = `${pair.reserve0.symbol.ticker}@${pair.reserve0.contract}`;
-        const token2Key = `${pair.reserve1.symbol.ticker}@${pair.reserve1.contract}`;
-        const logo1 = logos[token1Key];
-        const logo2 = logos[token2Key];
-        if (logo1 && logo2) {
-            logos[pairKey] = {
-                logo: `https://resizer.neftyblocks.com/composer?left=${encodeURIComponent(
-                    logo1.logo_lg
-                )}&right=${encodeURIComponent(logo2.logo_lg)}&width=100`,
-                logo_lg: `https://resizer.neftyblocks.com/composer?left=${encodeURIComponent(
-                    logo1.logo_lg
-                )}&right=${encodeURIComponent(logo2.logo_lg)}&width=300`,
-            };
+    let newLogos = 0;
+    while (newLogos === 0) {
+        for (const pair of [...neftyPairs, ...tacoPairs]) {
+            const pairKey = `${pair.code}@${pair.contract}`;
+            const token1Key = `${pair.reserve0.symbol.ticker}@${pair.reserve0.contract}`;
+            const token2Key = `${pair.reserve1.symbol.ticker}@${pair.reserve1.contract}`;
+            const logo1 = logos[token1Key];
+            const logo2 = logos[token2Key];
+            if (logo1 && logo2 && !logos[pairKey]) {
+                logos[pairKey] = {
+                    logo: `https://resizer.neftyblocks.com/composer?left=${encodeURIComponent(
+                        logo1.logo_lg
+                    )}&right=${encodeURIComponent(logo2.logo_lg)}&width=100`,
+                    logo_lg: `https://resizer.neftyblocks.com/composer?left=${encodeURIComponent(
+                        logo1.logo_lg
+                    )}&right=${encodeURIComponent(logo2.logo_lg)}&width=300`,
+                };
+                newLogos++;
+            }
         }
+
+        if (newLogos === 0) break;
+        newLogos = 0;
     }
 
     return logos;
