@@ -6,7 +6,7 @@ import { getAllNeftyPairs, Pair } from "../../../services/pairs";
 import { getAllLogos } from "../../../services/logos";
 import { getAllTaxes } from "../../../services/taxes";
 
-const pageSize = 50;
+const pageSize = 100;
 
 function getTokenApisFromPairs(pairs: Pair[]): TokenApi[] {
     const tokensMap = new Map<string, TokenApi>();
