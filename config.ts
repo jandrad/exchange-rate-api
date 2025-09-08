@@ -21,12 +21,12 @@ export const config: Config = {
         wax: {
             NEFTY_API: "https://aa.neftyblocks.com",
             CHAIN_API: "https://wax.neftyblocks.com",
-            LIGHT_API: ["https://lightapi-mainnet.neftyblocks.com", "https://wax.light-api.net"],
+            LIGHT_API: ["https://wax.light-api.net"],
         },
         waxtest: {
             NEFTY_API: "https://aa-testnet.neftyblocks.com",
             CHAIN_API: "https://wax-testnet.neftyblocks.com",
-            LIGHT_API: ["https://lightapi-testnet.neftyblocks.com", "https://testnet-lightapi.eosams.xeos.me"],
+            LIGHT_API: ["https://testnet-lightapi.eosams.xeos.me"],
         },
         proton: {
             LIGHT_API: ["https://proton.light-api.net"],
