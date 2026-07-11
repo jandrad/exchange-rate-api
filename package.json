@@ -7,7 +7,7 @@
     "scripts": {
         "dev": "wrangler pages dev . --kv=ERA",
         "build": "cpy index.html favicon.ico openapi.yml dist",
-        "deploy": "wrangler pages deploy dist"
+        "deploy": "wrangler pages deploy dist --project-name exchange-rate-api"
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^4.20240614.0",
