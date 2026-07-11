@@ -7,26 +7,6 @@ async function rate(symbol?: string | null): Promise<Response> {
         }
 
         let rate;
-        try {
-            const result = await fetch(
-                `https://min-api.cryptocompare.com/data/price?fsym=${symbol.toUpperCase()}&tsyms=USD`,
-                {
-                    method: "GET",
-                    redirect: "follow",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                }
-            );
-            if (result.status === 200) {
-                rate = ((await result.json()) as any).USD;
-            } else {
-                console.log("Error: " + result.status + " " + (await result.text()));
-            }
-        } catch (error) {
-            console.log(error);
-        }
-
         if (!rate) {
             const result = await fetch(`https://cryptoprices.cc/${symbol.toLocaleUpperCase()}`, {
                 method: "GET",
