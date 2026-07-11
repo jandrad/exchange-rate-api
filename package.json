@@ -6,8 +6,8 @@
     "private": true,
     "scripts": {
         "dev": "wrangler pages dev . --kv=ERA",
-        "build": "wrangler build",
-        "deploy": "wrangler publish"
+        "build": "cpy index.html favicon.ico openapi.yml dist",
+        "deploy": "wrangler pages deploy dist"
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^4.20240614.0",
