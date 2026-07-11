@@ -1,0 +1,16 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "exchange-rate-api",
+    "main": ".worker/index.js",
+    "compatibility_date": "2026-07-11",
+    "keep_vars": true,
+    "kv_namespaces": [
+        {
+            "binding": "ERA"
+        }
+    ],
+    "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS"
+    }
+}
