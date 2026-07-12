@@ -5,7 +5,7 @@
     "private": true,
     "scripts": {
         "dev": "pnpm run build && wrangler dev",
-        "build": "cpy index.html favicon.ico openapi.yml dist && wrangler pages functions build functions --outdir .worker --project-directory . --build-output-directory dist",
+        "build": "wrangler pages functions build functions --outdir .worker --project-directory . --build-output-directory dist",
         "deploy": "wrangler deploy",
         "typegen": "wrangler types"
     },
